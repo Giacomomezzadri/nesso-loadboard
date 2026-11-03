@@ -82,6 +82,39 @@ export interface PlannedDay {
   updatedAt: string
 }
 
+/** A left/right asymmetry as exported by force plates: "12 R" = 12%, right side dominant. */
+export interface Asymmetry {
+  pct: number
+  side?: 'L' | 'R'
+}
+
+/**
+ * One jump test (ForceDecks CMJ, DJ, …) for one player. `metrics` and `asymmetries` are keyed
+ * by the export's own column header (trimmed), so every column is kept and the catalog in
+ * lib/metrics/jumpTests.ts picks which ones to show.
+ */
+export interface JumpTest {
+  id: string // `${playerId}:${testType}:${date}:${time}`
+  playerId: string
+  /** As exported, upper-cased — "CMJ", "DJ", … */
+  testType: string
+  date: string // ISO "YYYY-MM-DD"
+  time?: string // "HH:MM", 24h
+  bodyWeightKg?: number
+  reps?: number
+  /** The name exactly as spelled in the export — kept for traceability of the match. */
+  sourceName: string
+  metrics: Record<string, number>
+  asymmetries: Record<string, Asymmetry>
+  importedAt: string
+}
+
+/** A hand-made pairing of an externally spelled name (normalized) to a roster player. */
+export interface PlayerAlias {
+  aliasKey: string
+  playerId: string
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string

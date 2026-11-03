@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { PlayerScatterChart, type ScatterPoint } from '../components/charts/PlayerScatterChart'
 import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
+import { JUMP_TESTS, latestTestByPlayer } from '../lib/metrics/jumpTests'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllSegmentsQuery, useJumpTestsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { matchDayLabels, type DrillSegment, type Player, type SessionType } from '../types/domain'
 
 type TypeFilter = SessionType | 'all'
@@ -31,6 +32,10 @@ interface RosterMetricSpec {
   unit: string
   getValue: (p: Player) => number | undefined
   sortOrder: 'asc' | 'desc'
+  /** Overrides the unit-based default below. */
+  decimals?: number
+  /** Shown after the value, e.g. the dominant side of an asymmetry. */
+  getSuffix?: (p: Player) => string | undefined
 }
 
 interface ScatterVarSpec {
@@ -60,6 +65,7 @@ export function LeaderboardPage() {
   const { data: segments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { data: jumpTests = [] } = useJumpTestsQuery()
   const [metricKey, setMetricKey] = useState('td')
   // Empty means "not touched by the user yet" — falls back to the current session's own date below,
   // so the default view still shows a single day (that session) rather than the whole history.
@@ -92,7 +98,39 @@ export function LeaderboardPage() {
     { key: 'height', label: 'Altezza', unit: 'cm', getValue: (p) => p.heightCm, sortOrder: 'desc' },
     { key: 'weight', label: 'Peso', unit: 'kg', getValue: (p) => p.weightKg, sortOrder: 'desc' },
   ]
-  const rosterMetric = rosterMetrics.find((m) => m.key === metricKey)
+  // Jump tests (ForceDecks imports): each player's LATEST test of that type, like the roster figures
+  // above — independent of the period/type filter. Asymmetries rank ascending (most balanced first).
+  const jumpMetrics: RosterMetricSpec[] = JUMP_TESTS.flatMap((def) => {
+    const latest = latestTestByPlayer(jumpTests, def.testType)
+    return [
+      ...def.metrics.map(
+        (m): RosterMetricSpec => ({
+          key: `jump:${def.testType}:${m.column}`,
+          label: `${def.label} · ${m.label}`,
+          unit: m.unit,
+          decimals: m.decimals,
+          sortOrder: m.higherIsBetter ? 'desc' : 'asc',
+          getValue: (p) => latest.get(p.id)?.metrics[m.column],
+        }),
+      ),
+      ...def.asymmetries.map(
+        (a): RosterMetricSpec => ({
+          key: `jump-asym:${def.testType}:${a.column}`,
+          label: `${def.label} · Asimmetria ${a.label.toLowerCase()}`,
+          unit: '%',
+          decimals: 1,
+          sortOrder: 'asc',
+          getValue: (p) => latest.get(p.id)?.asymmetries[a.column]?.pct,
+          getSuffix: (p) => {
+            const side = latest.get(p.id)?.asymmetries[a.column]?.side
+            return side === 'L' ? 'SX' : side === 'R' ? 'DX' : undefined
+          },
+        }),
+      ),
+    ]
+  })
+  const rosterMetric = [...rosterMetrics, ...jumpMetrics].find((m) => m.key === metricKey)
+  const isJumpMetric = jumpMetrics.some((m) => m.key === metricKey)
   const segmentMetric = metrics.find((m) => m.key === metricKey)
 
   const effectiveStart = startDate || currentSession.date
@@ -155,7 +193,11 @@ export function LeaderboardPage() {
       <EmptyState
         icon={Trophy}
         title="Nessun dato registrato"
-        description={`Inserisci i dati di "${rosterMetric.label}" in Roster & Positions per vedere questa classifica.`}
+        description={
+          isJumpMetric
+            ? `Nessun giocatore attivo ha ancora un test con "${rosterMetric.label}". Importa i test di salto dalla pagina Sessioni.`
+            : `Inserisci i dati di "${rosterMetric.label}" in Roster & Positions per vedere questa classifica.`
+        }
       />
     )
   }
@@ -163,7 +205,7 @@ export function LeaderboardPage() {
   const values = rows.map((r) => r.value)
   const maxValue = Math.max(...values, 1)
   const minValue = Math.min(...values, 0)
-  const decimals = unit === 'km/h' || unit === 'kg' ? 1 : unit === 's' ? 3 : 0
+  const decimals = rosterMetric?.decimals ?? (unit === 'km/h' || unit === 'kg' ? 1 : unit === 's' ? 3 : 0)
   const barWidthPct = (value: number) => {
     if (higherIsBetter) return Math.min(100, (value / maxValue) * 100)
     const range = maxValue - minValue
@@ -186,6 +228,17 @@ export function LeaderboardPage() {
       unit: 'kg',
       values: new Map(activePlayers.filter((p) => p.weightKg !== undefined).map((p) => [p.id, p.weightKg as number])),
     },
+    ...jumpMetrics.map((m) => ({
+      key: m.key,
+      label: m.label,
+      unit: m.unit,
+      values: new Map(
+        activePlayers.flatMap((p): [string, number][] => {
+          const v = m.getValue(p)
+          return v === undefined ? [] : [[p.id, v]]
+        }),
+      ),
+    })),
   ]
   const xVar = scatterVariables.find((v) => v.key === xVarKey) ?? scatterVariables[0]
   const yVar = scatterVariables.find((v) => v.key === yVarKey) ?? scatterVariables[1]
@@ -203,7 +256,9 @@ export function LeaderboardPage() {
         Classifica dei giocatori attivi in base alla metrica scelta. Le metriche GPS sono calcolate sul periodo e
         sul tipo di sessione selezionati. Le metriche contrassegnate con <strong>*</strong> (Sprint 10m, Sprint
         30m, Altezza, Peso) vengono invece da Roster &amp; Positions: sono <strong>indipendenti dal periodo
-        selezionato</strong> e mostrano sempre il dato più recente inserito. Lo scatterplot in fondo mette a
+        selezionato</strong> e mostrano sempre il dato più recente inserito. Lo stesso vale per i{' '}
+        <strong>test di salto</strong> (CMJ, Drop Jump), che usano l'ultimo test di ogni giocatore; le asimmetrie sono
+        ordinate dalla più bassa. Lo scatterplot in fondo mette a
         confronto due variabili a scelta (anche altezza e peso) per individuare relazioni tra i giocatori.
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -223,6 +278,13 @@ export function LeaderboardPage() {
             </optgroup>
             <optgroup label="Roster">
               {rosterMetrics.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label} *
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Test di salto (ultimo test)">
+              {jumpMetrics.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.label} *
                 </option>
@@ -267,7 +329,10 @@ export function LeaderboardPage() {
               </div>
               <span className="w-16 shrink-0 text-right tabular-nums text-ink">
                 {row.value.toFixed(decimals)}
-                {rosterMetric ? ` ${unit}` : ''}
+                {rosterMetric && unit ? ` ${unit}` : ''}
+                {rosterMetric?.getSuffix && playerById.get(row.playerId)
+                  ? ` ${rosterMetric.getSuffix(playerById.get(row.playerId)!) ?? ''}`
+                  : ''}
               </span>
             </div>
           ))}
