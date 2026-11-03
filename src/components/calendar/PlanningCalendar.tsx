@@ -26,37 +26,108 @@ const KIND_LABEL: Record<PlannedDayKind, string> = {
 }
 
 // One categorical hue per training type (the dataviz palette in index.css), so a week reads
-// at a glance; the match keeps the brand accent and the day off stays neutral.
-const TRAINING_STYLE: Record<TrainingType, { chip: string; dot: string; short: string }> = {
-  ripresa: { chip: 'bg-series-aqua/12 text-ink border-series-aqua/40', dot: 'bg-series-aqua', short: 'RIP' },
-  forza: { chip: 'bg-series-red/12 text-ink border-series-red/40', dot: 'bg-series-red', short: 'FOR' },
-  metabolico_alte_velocita: { chip: 'bg-series-orange/12 text-ink border-series-orange/40', dot: 'bg-series-orange', short: 'MET' },
-  rifinitura: { chip: 'bg-series-violet/12 text-ink border-series-violet/40', dot: 'bg-series-violet', short: 'RIF' },
-  recupero_attivo: { chip: 'bg-series-green/12 text-ink border-series-green/40', dot: 'bg-series-green', short: 'REC' },
-  mix: { chip: 'bg-series-blue/12 text-ink border-series-blue/40', dot: 'bg-series-blue', short: 'MIX' },
-  amichevole: { chip: 'bg-series-magenta/14 text-ink border-series-magenta/40', dot: 'bg-series-magenta', short: 'AMI' },
+// at a glance; the match keeps the brand accent and the day off stays neutral. A planned day
+// tints its whole cell (`cell`) and gets a solid left edge (`bar`); `chip`/`dot` are for the
+// editor's type picker and the legend.
+interface DayStyle {
+  cell: string
+  bar: string
+  chip: string
+  dot: string
+  short: string
 }
-const GENERIC_TRAINING_STYLE = { chip: 'bg-primary/8 text-ink border-primary/30', dot: 'bg-primary', short: 'ALL' }
-const MATCH_STYLE = { chip: 'bg-accent/25 text-ink border-accent', dot: 'bg-accent', short: 'GARA' }
-const DAY_OFF_STYLE = { chip: 'bg-ink/5 text-ink-muted border-transparent', dot: 'bg-ink-muted', short: 'OFF' }
+const TRAINING_STYLE: Record<TrainingType, DayStyle> = {
+  ripresa: {
+    cell: 'bg-series-aqua/10 border-series-aqua/35',
+    bar: 'bg-series-aqua',
+    chip: 'bg-series-aqua/12 text-ink border-series-aqua/40',
+    dot: 'bg-series-aqua',
+    short: 'RIP',
+  },
+  forza: {
+    cell: 'bg-series-red/10 border-series-red/35',
+    bar: 'bg-series-red',
+    chip: 'bg-series-red/12 text-ink border-series-red/40',
+    dot: 'bg-series-red',
+    short: 'FOR',
+  },
+  metabolico_alte_velocita: {
+    cell: 'bg-series-orange/10 border-series-orange/35',
+    bar: 'bg-series-orange',
+    chip: 'bg-series-orange/12 text-ink border-series-orange/40',
+    dot: 'bg-series-orange',
+    short: 'MET',
+  },
+  rifinitura: {
+    cell: 'bg-series-violet/10 border-series-violet/35',
+    bar: 'bg-series-violet',
+    chip: 'bg-series-violet/12 text-ink border-series-violet/40',
+    dot: 'bg-series-violet',
+    short: 'RIF',
+  },
+  recupero_attivo: {
+    cell: 'bg-series-green/10 border-series-green/35',
+    bar: 'bg-series-green',
+    chip: 'bg-series-green/12 text-ink border-series-green/40',
+    dot: 'bg-series-green',
+    short: 'REC',
+  },
+  mix: {
+    cell: 'bg-series-blue/10 border-series-blue/35',
+    bar: 'bg-series-blue',
+    chip: 'bg-series-blue/12 text-ink border-series-blue/40',
+    dot: 'bg-series-blue',
+    short: 'MIX',
+  },
+  amichevole: {
+    cell: 'bg-series-magenta/12 border-series-magenta/35',
+    bar: 'bg-series-magenta',
+    chip: 'bg-series-magenta/14 text-ink border-series-magenta/40',
+    dot: 'bg-series-magenta',
+    short: 'AMI',
+  },
+}
+const GENERIC_TRAINING_STYLE: DayStyle = {
+  cell: 'bg-primary/6 border-primary/25',
+  bar: 'bg-primary',
+  chip: 'bg-primary/8 text-ink border-primary/30',
+  dot: 'bg-primary',
+  short: 'ALL',
+}
+const MATCH_STYLE: DayStyle = {
+  cell: 'bg-accent/20 border-accent/70',
+  bar: 'bg-accent',
+  chip: 'bg-accent/25 text-ink border-accent',
+  dot: 'bg-accent',
+  short: 'GARA',
+}
+// Diagonal hatching reads as "nothing on" without competing with the coloured days.
+const DAY_OFF_STYLE: DayStyle = {
+  cell: 'border-border bg-[repeating-linear-gradient(135deg,var(--color-grid)_0_5px,transparent_5px_10px)]',
+  bar: 'bg-ink-muted/40',
+  chip: 'bg-ink/5 text-ink-muted border-transparent',
+  dot: 'bg-ink-muted',
+  short: 'OFF',
+}
 
-function styleFor(day: PlannedDay) {
+function styleFor(day: PlannedDay): DayStyle {
   if (day.kind === 'match') return MATCH_STYLE
   if (day.kind === 'day_off') return DAY_OFF_STYLE
   return day.trainingType ? TRAINING_STYLE[day.trainingType] : GENERIC_TRAINING_STYLE
 }
 
-function labelFor(day: PlannedDay): { full: string; short: string } {
+/** `title` is the main line, `meta` the small caption under it, `short` the phone-width tag. */
+function labelFor(day: PlannedDay): { title: string; meta: string; short: string } {
   if (day.kind === 'match') {
-    const where = day.matchLocation ? (day.matchLocation === 'home' ? ' (C)' : ' (T)') : ''
+    const meta = day.matchLocation ? `Partita · ${MATCH_LOCATION_LABEL[day.matchLocation]}` : 'Partita'
     return day.opponentName
-      ? { full: `${day.opponentName}${where}`, short: opponentInitials(day.opponentName) }
-      : { full: `Partita${where}`, short: MATCH_STYLE.short }
+      ? { title: day.opponentName, meta, short: opponentInitials(day.opponentName) }
+      : { title: 'Partita', meta: day.matchLocation ? MATCH_LOCATION_LABEL[day.matchLocation] : '', short: MATCH_STYLE.short }
   }
-  if (day.kind === 'day_off') return { full: 'Day off', short: DAY_OFF_STYLE.short }
+  if (day.kind === 'day_off') return { title: 'Day off', meta: 'Riposo', short: DAY_OFF_STYLE.short }
   return day.trainingType
-    ? { full: TRAINING_TYPE_LABEL[day.trainingType], short: TRAINING_STYLE[day.trainingType].short }
-    : { full: 'Allenamento', short: GENERIC_TRAINING_STYLE.short }
+    ? { title: TRAINING_TYPE_LABEL[day.trainingType], meta: 'Allenamento', short: TRAINING_STYLE[day.trainingType].short }
+    : { title: 'Allenamento', meta: '', short: GENERIC_TRAINING_STYLE.short }
 }
 
 // All date math in UTC on "YYYY-MM-DD" strings, so a DST switch can never skip or repeat a day.
@@ -186,11 +257,12 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
     clear.reset()
   }
 
-  const legend = [
-    { label: 'Partita', dot: MATCH_STYLE.dot },
-    ...(Object.keys(TRAINING_TYPE_LABEL) as TrainingType[]).map((t) => ({ label: TRAINING_TYPE_LABEL[t], dot: TRAINING_STYLE[t].dot })),
-    { label: 'Day off', dot: DAY_OFF_STYLE.dot },
-  ]
+  // Legend lists only what's on screen — nine entries for an empty month is just noise.
+  const legend = new Map<string, { label: string; dot: string }>()
+  for (const d of plannedDays) {
+    const label = d.kind === 'training' ? (d.trainingType ? TRAINING_TYPE_LABEL[d.trainingType] : 'Allenamento') : KIND_LABEL[d.kind]
+    legend.set(label, { label, dot: styleFor(d).dot })
+  }
 
   return (
     <section className="panel p-4 sm:p-5">
@@ -206,7 +278,7 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
           </p>
         </div>
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
-          {legend.map((l) => (
+          {[...legend.values()].map((l) => (
             <li key={l.label} className="flex items-center gap-1.5 text-[11px] text-ink-secondary">
               <span className={cn('size-2 rounded-full', l.dot)} />
               {l.label}
@@ -215,7 +287,7 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
         </ul>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
         {WEEKDAYS.map((w) => (
           <div key={w} className="pb-1 text-center text-[11px] font-medium uppercase tracking-wide text-ink-muted">
             {w}
@@ -224,7 +296,20 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
 
         {cells.map((date) => {
           const inWindow = date >= from && date <= to
-          if (!inWindow) return <div key={date} aria-hidden className="min-h-14 sm:min-h-20" />
+          // Outside the 10+20 window: a faint numbered placeholder, so the weeks read as full rows, not gaps.
+          if (!inWindow) {
+            return (
+              <div
+                key={date}
+                aria-hidden
+                className="min-h-16 rounded-lg border border-dashed border-border/60 px-1.5 pt-1.5 sm:min-h-24 sm:px-2.5 sm:pt-2"
+              >
+                <span className="font-display text-sm font-semibold tabular-nums leading-none text-ink-muted/50 sm:text-lg">
+                  {Number(date.slice(8, 10))}
+                </span>
+              </div>
+            )
+          }
 
           const planned = plannedByDate.get(date)
           const isToday = date === today
@@ -242,48 +327,63 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
               onClick={() => openDay(date)}
               disabled={!canEdit && !planned}
               aria-pressed={isSelected}
-              aria-label={`${fmt(LONG_DATE, date)}${label ? ` — ${label.full}` : ''}`}
+              aria-label={`${fmt(LONG_DATE, date)}${label ? ` — ${label.title}${label.meta ? `, ${label.meta}` : ''}` : ''}`}
               className={cn(
-                'group relative flex min-h-14 flex-col items-stretch gap-1 rounded-lg border p-1 text-left transition-colors sm:min-h-20 sm:p-1.5',
-                isSelected
-                  ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
-                  : 'border-border bg-surface enabled:hover:border-primary/40 enabled:hover:bg-surface-raised',
-                isPast && !isSelected && 'bg-page',
+                'group relative flex min-h-16 flex-col overflow-hidden rounded-lg border text-left transition sm:min-h-24',
+                style ? style.cell : isPast ? 'border-border/60 bg-page' : 'border-border bg-surface',
+                isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface' : 'enabled:hover:border-primary/50',
                 !canEdit && !planned && 'cursor-default',
               )}
             >
-              <span className="flex items-center justify-between gap-1">
+              {style && <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1', style.bar)} />}
+
+              <span className={cn('flex items-center justify-between gap-1 px-1.5 pt-1.5 sm:px-2.5 sm:pt-2', isPast && 'opacity-60')}>
                 <span
                   className={cn(
-                    'font-display text-sm font-semibold tabular-nums leading-none sm:text-base',
+                    'font-display text-sm font-semibold tabular-nums leading-none sm:text-lg',
                     isToday
-                      ? 'flex size-5 items-center justify-center rounded-full bg-primary text-primary-ink sm:size-6'
-                      : isPast
-                        ? 'text-ink-muted'
-                        : 'text-ink',
+                      ? 'flex size-5 items-center justify-center rounded-full bg-primary text-xs text-primary-ink sm:size-7 sm:text-sm'
+                      : 'text-ink',
                   )}
                 >
                   {dayNumber}
                 </span>
-                {showMonth && !isToday && (
-                  <span className="hidden text-[10px] uppercase tracking-wide text-ink-muted sm:inline">{fmt(MONTH_SHORT, date)}</span>
-                )}
-                {importedDates.has(date) && (
-                  <Check className="size-3 shrink-0 text-status-good" aria-label="Sessione importata" />
-                )}
+                <span className="flex items-center gap-1">
+                  {showMonth && (
+                    <span className="hidden text-[10px] font-medium uppercase tracking-wide text-ink-muted sm:inline">
+                      {fmt(MONTH_SHORT, date)}
+                    </span>
+                  )}
+                  {importedDates.has(date) && (
+                    <Check className="size-3 shrink-0 text-status-good sm:size-3.5" aria-label="Sessione importata" />
+                  )}
+                </span>
               </span>
 
-              {label && style && (
-                <span
-                  className={cn(
-                    'mt-auto truncate rounded-md border px-1 py-0.5 text-center text-[10px] font-semibold leading-tight sm:px-1.5 sm:text-left sm:text-[11px] sm:font-medium',
-                    style.chip,
-                    isPast && 'opacity-70',
-                  )}
-                >
-                  <span className="sm:hidden">{label.short}</span>
-                  <span className="hidden sm:inline">{label.full}</span>
+              {label ? (
+                <span className={cn('flex flex-1 flex-col justify-end px-1.5 pb-1.5 sm:px-2.5 sm:pb-2', isPast && 'opacity-60')}>
+                  {/* Phone: one bold tag that fills the narrow cell. */}
+                  <span className="font-display text-center text-xs font-bold uppercase tracking-wide text-ink sm:hidden">
+                    {label.short}
+                  </span>
+                  {/* Wider screens: the full name, wrapped over two lines, plus a caption. */}
+                  <span className="hidden sm:block">
+                    <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-ink">{label.title}</span>
+                    {label.meta && (
+                      <span className="mt-0.5 block truncate text-[11px] text-ink-secondary">{label.meta}</span>
+                    )}
+                  </span>
                 </span>
+              ) : (
+                canEdit &&
+                !isPast && (
+                  <span
+                    aria-hidden
+                    className="flex flex-1 items-center justify-center text-lg font-light text-ink-muted opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    +
+                  </span>
+                )
               )}
             </button>
           )
