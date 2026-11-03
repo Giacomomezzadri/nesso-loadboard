@@ -1,12 +1,14 @@
 import { ArrowRight, ShieldCheck, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PlanningCalendar } from '../components/calendar/PlanningCalendar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
+import { useAuth } from '../state/AuthContext'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import {
   useAllSegmentsQuery,
@@ -41,25 +43,29 @@ export function OverviewPage() {
   const { data: settings } = useSettingsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: allSegments = [] } = useAllSegmentsQuery()
+  const { canEdit } = useAuth()
   const [microMetricKey, setMicroMetricKey] = useState(SELECTABLE_MICROCYCLE_METRICS[0].key)
 
   if (isLoading) return null
 
   if (sessions.length === 0) {
     return (
-      <EmptyState
-        icon={Upload}
-        title="Nessuna sessione ancora importata"
-        description="Importa il primo export CSV per vedere la dashboard di questa sessione — distanze, HSR, mechanical work e altro."
-        action={
-          <Link
-            to="/sessions"
-            className="mt-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90"
-          >
-            Importa una sessione
-          </Link>
-        }
-      />
+      <div className="flex flex-col gap-6">
+        <EmptyState
+          icon={Upload}
+          title="Nessuna sessione ancora importata"
+          description="Importa il primo export CSV per vedere la dashboard di questa sessione — distanze, HSR, mechanical work e altro."
+          action={
+            <Link
+              to="/sessions"
+              className="mt-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90"
+            >
+              Importa una sessione
+            </Link>
+          }
+        />
+        <PlanningCalendar sessions={sessions} canEdit={canEdit} />
+      </div>
     )
   }
 
@@ -161,6 +167,8 @@ export function OverviewPage() {
           </ul>
         )}
       </div>
+
+      <PlanningCalendar sessions={sessions} canEdit={canEdit} />
 
       {microcycleByPlayer.length > 0 && (
         <div className="panel p-4">
