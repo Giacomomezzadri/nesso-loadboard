@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   listAllRpe,
   listAllSegments,
@@ -73,7 +73,11 @@ export function useSettingsQuery() {
 
 /** Planned calendar days in [from, to] — see PlanningCalendar. */
 export function usePlannedDaysQuery(from: string, to: string) {
-  return useQuery({ queryKey: queryKeys.plannedDays(from, to), queryFn: () => listPlannedDays(from, to) })
+  return useQuery({
+    queryKey: queryKeys.plannedDays(from, to),
+    queryFn: () => listPlannedDays(from, to),
+    placeholderData: keepPreviousData,
+  })
 }
 
 /** After setting or clearing a planned day — every cached calendar window. */
