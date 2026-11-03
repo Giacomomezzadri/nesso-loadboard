@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { CalendarDays, Check, X } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { deletePlannedDay, putPlannedDay } from '../../lib/db/repo'
 import { cn } from '../../lib/utils'
 import { useInvalidatePlannedDays, usePlannedDaysQuery } from '../../state/queries'
@@ -130,6 +131,18 @@ function labelFor(day: PlannedDay): { title: string; meta: string; short: string
     : { title: 'Allenamento', meta: '', short: GENERIC_TRAINING_STYLE.short }
 }
 
+/** An imported session read as a calendar day — same shape as a manual plan, so it renders identically. */
+function sessionToDay(session: Session): PlannedDay {
+  return {
+    date: session.date,
+    kind: session.type,
+    trainingType: session.type === 'training' ? session.trainingType : undefined,
+    opponentName: session.type === 'match' ? session.opponentName : undefined,
+    matchLocation: session.type === 'match' ? session.matchLocation : undefined,
+    updatedAt: session.importedAt,
+  }
+}
+
 // All date math in UTC on "YYYY-MM-DD" strings, so a DST switch can never skip or repeat a day.
 function toIso(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -201,7 +214,11 @@ function Segmented<T extends string>({
 /**
  * Planning calendar for Overview: the last 10 days, today and the next 20. Editors pick, per
  * day, a match, a training (optionally of a given type) or a day off; viewers see it read-only.
- * A small check marks days that already have an imported GPS session.
+ *
+ * Imported GPS sessions fill the calendar on their own: a day with a session shows that
+ * session (type, training type, opponent) whatever was planned for it, since it's what actually
+ * happened — so importing is enough, nobody has to retype it here. Correcting such a day means
+ * editing the session itself, which also fixes every stat built on it. A check marks these days.
  */
 export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; canEdit: boolean }) {
   const today = localTodayIso()
@@ -213,8 +230,24 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
   const [draft, setDraft] = useState<Draft>(draftFrom(undefined))
 
   const plannedByDate = new Map(plannedDays.map((d) => [d.date, d]))
-  const importedDates = new Set(sessions.map((s) => s.date))
-  const selected = selectedDate ? plannedByDate.get(selectedDate) : undefined
+  // A double session day keeps every session; the match (if any) leads, then import order.
+  const sessionsByDate = new Map<string, Session[]>()
+  for (const session of sessions) {
+    if (session.date < from || session.date > to) continue
+    const list = sessionsByDate.get(session.date) ?? []
+    list.push(session)
+    sessionsByDate.set(session.date, list)
+  }
+  for (const list of sessionsByDate.values()) {
+    list.sort((a, b) => Number(b.type === 'match') - Number(a.type === 'match') || a.importedAt.localeCompare(b.importedAt))
+  }
+  // What each day shows: the imported session when there is one, otherwise the manual plan.
+  const shownByDate = new Map(plannedByDate)
+  for (const [date, list] of sessionsByDate) shownByDate.set(date, sessionToDay(list[0]))
+
+  const selected = selectedDate ? shownByDate.get(selectedDate) : undefined
+  const selectedSessions = selectedDate ? (sessionsByDate.get(selectedDate) ?? []) : []
+  const selectedPlan = selectedDate ? plannedByDate.get(selectedDate) : undefined
 
   // Full Monday–Sunday weeks around the window; days outside it keep the grid aligned but stay blank.
   const gridStart = addDays(from, -weekdayIndex(from))
@@ -259,7 +292,7 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
 
   // Legend lists only what's on screen — nine entries for an empty month is just noise.
   const legend = new Map<string, { label: string; dot: string }>()
-  for (const d of plannedDays) {
+  for (const d of shownByDate.values()) {
     const label = d.kind === 'training' ? (d.trainingType ? TRAINING_TYPE_LABEL[d.trainingType] : 'Allenamento') : KIND_LABEL[d.kind]
     legend.set(label, { label, dot: styleFor(d).dot })
   }
@@ -274,7 +307,8 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
           </p>
           <p className="text-xs text-ink-muted">
             {fmt(RANGE_DATE, from)} – {fmt(RANGE_DATE, to)} · 10 giorni precedenti e 20 successivi
-            {canEdit && ' · tocca un giorno per pianificarlo'}
+            {' · le sessioni importate compaiono da sole'}
+            {canEdit && ', tocca un giorno libero per pianificarlo'}
           </p>
         </div>
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
@@ -311,13 +345,16 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
             )
           }
 
-          const planned = plannedByDate.get(date)
+          const planned = shownByDate.get(date)
+          const imported = sessionsByDate.get(date) ?? []
           const isToday = date === today
           const isPast = date < today
           const isSelected = date === selectedDate
           const dayNumber = Number(date.slice(8, 10))
           const showMonth = dayNumber === 1 || date === from
-          const label = planned ? labelFor(planned) : null
+          const base = planned ? labelFor(planned) : null
+          const label =
+            base && imported.length > 1 ? { ...base, meta: `${imported.length} sessioni`, short: `${base.short}+` } : base
           const style = planned ? styleFor(planned) : null
 
           return (
@@ -354,7 +391,7 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
                       {fmt(MONTH_SHORT, date)}
                     </span>
                   )}
-                  {importedDates.has(date) && (
+                  {imported.length > 0 && (
                     <Check className="size-3 shrink-0 text-status-good sm:size-3.5" aria-label="Sessione importata" />
                   )}
                 </span>
@@ -406,7 +443,51 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
             </button>
           </div>
 
-          {!canEdit ? (
+          {selectedSessions.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-1.5">
+                {selectedSessions.map((session) => {
+                  const day = labelFor(sessionToDay(session))
+                  return (
+                    <li key={session.id} className="flex items-center gap-2 text-sm">
+                      <span className={cn('size-2 shrink-0 rounded-full', styleFor(sessionToDay(session)).dot)} />
+                      <span className="font-medium text-ink">{session.label}</span>
+                      <span className="truncate text-ink-secondary">
+                        · {day.title}
+                        {day.meta && day.meta !== day.title ? ` · ${day.meta}` : ''}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="flex items-start gap-1.5 text-xs text-ink-muted">
+                <Check className="mt-px size-3.5 shrink-0 text-status-good" />
+                Giorno compilato dalla sessione importata.
+                {canEdit && ' Per cambiarlo modifica la sessione: si aggiornano anche le statistiche.'}
+              </p>
+              {canEdit && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/sessions"
+                    className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
+                  >
+                    Vai alle sessioni
+                  </Link>
+                  {selectedPlan && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => clear.mutate(selectedDate)}
+                      className="rounded-md px-3 py-1.5 text-sm font-medium text-ink-secondary hover:bg-ink/5 hover:text-status-critical disabled:opacity-50"
+                    >
+                      {clear.isPending ? 'Rimozione…' : 'Elimina la pianificazione precedente'}
+                    </button>
+                  )}
+                </div>
+              )}
+              {error && <p className="text-xs text-status-critical">{(error as Error).message}</p>}
+            </div>
+          ) : !canEdit ? (
             <p className="text-sm text-ink-secondary">
               {selected
                 ? [
