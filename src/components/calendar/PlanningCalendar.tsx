@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
-import { CalendarDays, Check, X } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deletePlannedDay, putPlannedDay } from '../../lib/db/repo'
 import { cn } from '../../lib/utils'
@@ -18,6 +18,9 @@ import {
 
 const DAYS_BEFORE = 10
 const DAYS_AFTER = 20
+/** Each arrow (or swipe) moves the window by a whole week, so the Monday–Sunday rows stay put. */
+const PAGE_DAYS = 7
+const SWIPE_MIN_PX = 50
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 const KIND_LABEL: Record<PlannedDayKind, string> = {
@@ -212,7 +215,8 @@ function Segmented<T extends string>({
 }
 
 /**
- * Planning calendar for Overview: the last 10 days, today and the next 20. Editors pick, per
+ * Planning calendar for Overview: opens on the last 10 days, today and the next 20, and pages a
+ * week at a time backwards/forwards (arrows or swipe), with "Oggi" to jump back. Editors pick, per
  * day, a match, a training (optionally of a given type) or a day off; viewers see it read-only.
  *
  * Imported GPS sessions fill the calendar on their own: a day with a session shows that
@@ -222,8 +226,12 @@ function Segmented<T extends string>({
  */
 export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; canEdit: boolean }) {
   const today = localTodayIso()
-  const from = addDays(today, -DAYS_BEFORE)
-  const to = addDays(today, DAYS_AFTER)
+  // Weeks away from the default "10 back, 20 ahead of today" window; 0 = that default.
+  const [weekOffset, setWeekOffset] = useState(0)
+  const anchor = addDays(today, weekOffset * PAGE_DAYS)
+  const from = addDays(anchor, -DAYS_BEFORE)
+  const to = addDays(anchor, DAYS_AFTER)
+  const touchStartX = useRef<number | null>(null)
   const { data: plannedDays = [], isLoading } = usePlannedDaysQuery(from, to)
   const invalidate = useInvalidatePlannedDays()
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -279,6 +287,11 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
   const busy = save.isPending || clear.isPending
   const error = save.error ?? clear.error
 
+  const goTo = (offset: number) => {
+    setWeekOffset(offset)
+    setSelectedDate(null)
+  }
+
   const openDay = (date: string) => {
     if (selectedDate === date) {
       setSelectedDate(null)
@@ -299,17 +312,48 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
 
   return (
     <section className="panel p-4 sm:p-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="font-display flex items-center gap-2 text-base font-medium text-ink">
-            <CalendarDays className="size-4 text-primary" />
-            Calendario
-          </p>
-          <p className="text-xs text-ink-muted">
-            {fmt(RANGE_DATE, from)} – {fmt(RANGE_DATE, to)} · 10 giorni precedenti e 20 successivi
-            {' · le sessioni importate compaiono da sole'}
-            {canEdit && ', tocca un giorno libero per pianificarlo'}
-          </p>
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-display flex items-center gap-2 text-base font-medium text-ink">
+              <CalendarDays className="size-4 text-primary" />
+              Calendario
+            </p>
+            <p className="text-xs text-ink-muted">
+              <span className="font-medium text-ink-secondary">
+                {fmt(RANGE_DATE, from)} – {fmt(RANGE_DATE, to)}
+              </span>
+              {weekOffset === 0 && ' · 10 giorni precedenti e 20 successivi'}
+              {' · le sessioni importate compaiono da sole'}
+              {canEdit && ', tocca un giorno libero per pianificarlo'}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg border border-border bg-page p-1">
+            <button
+              type="button"
+              onClick={() => goTo(weekOffset - 1)}
+              className="rounded-md p-1.5 text-ink-secondary transition-colors hover:bg-surface hover:text-ink"
+              aria-label="Settimana precedente"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(0)}
+              disabled={weekOffset === 0}
+              className="rounded-md px-3 py-1 text-xs font-medium text-ink-secondary transition-colors enabled:hover:bg-surface enabled:hover:text-ink disabled:opacity-40"
+            >
+              Oggi
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(weekOffset + 1)}
+              className="rounded-md p-1.5 text-ink-secondary transition-colors hover:bg-surface hover:text-ink"
+              aria-label="Settimana successiva"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
         </div>
         <ul className="flex flex-wrap gap-x-3 gap-y-1">
           {[...legend.values()].map((l) => (
@@ -321,7 +365,19 @@ export function PlanningCalendar({ sessions, canEdit }: { sessions: Session[]; c
         </ul>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+      {/* Horizontal swipe pages the window on touch screens, same as the arrows. */}
+      <div
+        className="grid touch-pan-y grid-cols-7 gap-1 sm:gap-2"
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0].clientX
+        }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return
+          const dx = e.changedTouches[0].clientX - touchStartX.current
+          touchStartX.current = null
+          if (Math.abs(dx) >= SWIPE_MIN_PX) goTo(weekOffset + (dx < 0 ? 1 : -1))
+        }}
+      >
         {WEEKDAYS.map((w) => (
           <div key={w} className="pb-1 text-center text-[11px] font-medium uppercase tracking-wide text-ink-muted">
             {w}
