@@ -1,4 +1,13 @@
-import type { AppSettings, DrillSegment, PlannedDay, Player, RpeEntry, Session } from '../../types/domain'
+import type {
+  AppSettings,
+  DrillSegment,
+  JumpTest,
+  PlannedDay,
+  Player,
+  PlayerAlias,
+  RpeEntry,
+  Session,
+} from '../../types/domain'
 
 const DEFAULT_TIMEOUT_MS = 25000
 
@@ -125,6 +134,21 @@ export async function putPlannedDay(day: Omit<PlannedDay, 'updatedAt'>): Promise
 
 export async function deletePlannedDay(date: string): Promise<void> {
   await apiFetch(`/api/calendar/${date}`, { method: 'DELETE' })
+}
+
+// ---------- jump tests ----------
+
+export async function listJumpTests(): Promise<JumpTest[]> {
+  return apiFetch<JumpTest[]>('/api/jump-tests')
+}
+
+export async function listPlayerAliases(): Promise<PlayerAlias[]> {
+  return apiFetch<PlayerAlias[]>('/api/player-aliases')
+}
+
+/** Saves an import's tests together with the name pairings made by hand during it. */
+export async function putJumpTests(tests: JumpTest[], aliases: PlayerAlias[]): Promise<void> {
+  await apiFetch('/api/jump-tests/bulk', { method: 'POST', body: JSON.stringify({ tests, aliases }) })
 }
 
 // ---------- auth ----------

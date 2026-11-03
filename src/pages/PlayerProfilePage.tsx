@@ -3,6 +3,7 @@ import { Link2, ShieldCheck, UserCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { TrendBars } from '../components/charts/TrendBars'
 import { TrendLine } from '../components/charts/TrendLine'
+import { JumpTestsPanel } from '../components/jump/JumpTestsPanel'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
@@ -25,6 +26,7 @@ import { useCurrentSession } from '../state/CurrentSessionContext'
 import {
   useAllSegmentsQuery,
   useInvalidatePlayerLinks,
+  useJumpTestsQuery,
   useLinkedPlayerDataQuery,
   usePlayerLinksQuery,
   usePlayersQuery,
@@ -240,6 +242,7 @@ export function PlayerProfilePage() {
   const { data: allSegments = [] } = useAllSegmentsQuery()
   const { data: currentSessionRpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
+  const { data: jumpTests = [] } = useJumpTestsQuery()
   const { canEdit } = useAuth()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [trendMetricKey, setTrendMetricKey] = useState('td')
@@ -516,6 +519,8 @@ export function PlayerProfilePage() {
             />
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
+
+          {activePlayerId && <JumpTestsPanel playerId={activePlayerId} tests={jumpTests} activePlayerIds={activePlayerIdSet} />}
 
           {currentSession && (
             <div className="panel p-4">

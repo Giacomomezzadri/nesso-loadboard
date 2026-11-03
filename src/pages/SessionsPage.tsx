@@ -2,6 +2,7 @@ import { Gauge, Pencil, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImportWizard } from '../import/ImportWizard'
+import { JumpTestImport } from '../import/JumpTestImport'
 import { EmptyState } from '../components/ui/EmptyState'
 import { buildRpeEntries } from '../lib/csv/importSession'
 import { deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
@@ -362,7 +363,10 @@ export function SessionsPage() {
   const { data: sessions = [], isLoading } = useSessionsQuery()
   const { canEdit } = useAuth()
   const [importing, setImporting] = useState(false)
+  const [importingJumps, setImportingJumps] = useState(false)
   const navigate = useNavigate()
+
+  if (importingJumps && canEdit) return <JumpTestImport onClose={() => setImportingJumps(false)} />
 
   if (importing && canEdit) {
     return (
@@ -377,19 +381,28 @@ export function SessionsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-secondary">
           Storico delle sessioni importate in questo browser. Da qui puoi anche cambiarne la tipologia, correggere
           l'RPE o eliminarle.
         </p>
         {canEdit && (
-          <button
-            type="button"
-            onClick={() => setImporting(true)}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
-          >
-            <Upload className="size-4" /> Nuovo import
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportingJumps(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary/50"
+            >
+              <Upload className="size-4" /> Test di salto
+            </button>
+            <button
+              type="button"
+              onClick={() => setImporting(true)}
+              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
+            >
+              <Upload className="size-4" /> Nuovo import
+            </button>
+          </div>
         )}
       </div>
 

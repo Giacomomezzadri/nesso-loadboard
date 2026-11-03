@@ -10,7 +10,9 @@ import {
   listSegmentsBySession,
   listSessions,
   getSettings,
+  listJumpTests,
   listPlannedDays,
+  listPlayerAliases,
 } from '../lib/db/repo'
 
 export const queryKeys = {
@@ -25,6 +27,8 @@ export const queryKeys = {
   playerLinks: ['player-links'] as const,
   linkedPlayerData: ['player-links', 'linked-data'] as const,
   plannedDays: (from: string, to: string) => ['calendar', from, to] as const,
+  jumpTests: ['jump-tests'] as const,
+  playerAliases: ['player-aliases'] as const,
 }
 
 export function useSessionsQuery() {
@@ -84,6 +88,23 @@ export function usePlannedDaysQuery(from: string, to: string) {
 export function useInvalidatePlannedDays() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: ['calendar'] })
+}
+
+export function useJumpTestsQuery() {
+  return useQuery({ queryKey: queryKeys.jumpTests, queryFn: listJumpTests })
+}
+
+export function usePlayerAliasesQuery() {
+  return useQuery({ queryKey: queryKeys.playerAliases, queryFn: listPlayerAliases })
+}
+
+/** After a jump-test import — the tests and any name pairings saved with them. */
+export function useInvalidateJumpTests() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.jumpTests })
+    queryClient.invalidateQueries({ queryKey: queryKeys.playerAliases })
+  }
 }
 
 export function usePlayerLinksQuery() {
