@@ -10,6 +10,7 @@ import {
   listSegmentsBySession,
   listSessions,
   getSettings,
+  listPlannedDays,
 } from '../lib/db/repo'
 
 export const queryKeys = {
@@ -23,6 +24,7 @@ export const queryKeys = {
   settings: ['settings'] as const,
   playerLinks: ['player-links'] as const,
   linkedPlayerData: ['player-links', 'linked-data'] as const,
+  plannedDays: (from: string, to: string) => ['calendar', from, to] as const,
 }
 
 export function useSessionsQuery() {
@@ -67,6 +69,17 @@ export function useAllRpeQuery() {
 
 export function useSettingsQuery() {
   return useQuery({ queryKey: queryKeys.settings, queryFn: getSettings })
+}
+
+/** Planned calendar days in [from, to] — see PlanningCalendar. */
+export function usePlannedDaysQuery(from: string, to: string) {
+  return useQuery({ queryKey: queryKeys.plannedDays(from, to), queryFn: () => listPlannedDays(from, to) })
+}
+
+/** After setting or clearing a planned day — every cached calendar window. */
+export function useInvalidatePlannedDays() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ queryKey: ['calendar'] })
 }
 
 export function usePlayerLinksQuery() {

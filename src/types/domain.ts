@@ -67,6 +67,21 @@ export function matchDayLabels(sessions: Session[]): Record<string, string> {
   return result
 }
 
+/** What the staff plans for a calendar day — set by hand on the Overview calendar, independent of imported sessions. */
+export type PlannedDayKind = 'training' | 'match' | 'day_off'
+
+export interface PlannedDay {
+  date: string // ISO "YYYY-MM-DD"
+  kind: PlannedDayKind
+  /** Only meaningful when kind === 'training'; optional — a plain "Allenamento" without a type is allowed. */
+  trainingType?: TrainingType
+  /** Only meaningful when kind === 'match'. */
+  opponentName?: string
+  /** Only meaningful when kind === 'match'. */
+  matchLocation?: MatchLocation
+  updatedAt: string
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string

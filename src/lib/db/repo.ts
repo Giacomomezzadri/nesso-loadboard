@@ -1,4 +1,4 @@
-import type { AppSettings, DrillSegment, Player, RpeEntry, Session } from '../../types/domain'
+import type { AppSettings, DrillSegment, PlannedDay, Player, RpeEntry, Session } from '../../types/domain'
 
 const DEFAULT_TIMEOUT_MS = 25000
 
@@ -111,6 +111,20 @@ export async function getSettings(): Promise<AppSettings> {
 
 export async function putSettings(settings: AppSettings): Promise<void> {
   await apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(settings) })
+}
+
+// ---------- planning calendar ----------
+
+export async function listPlannedDays(from: string, to: string): Promise<PlannedDay[]> {
+  return apiFetch<PlannedDay[]>(`/api/calendar?from=${from}&to=${to}`)
+}
+
+export async function putPlannedDay(day: Omit<PlannedDay, 'updatedAt'>): Promise<PlannedDay> {
+  return apiFetch<PlannedDay>(`/api/calendar/${day.date}`, { method: 'PUT', body: JSON.stringify(day) })
+}
+
+export async function deletePlannedDay(date: string): Promise<void> {
+  await apiFetch(`/api/calendar/${date}`, { method: 'DELETE' })
 }
 
 // ---------- auth ----------
