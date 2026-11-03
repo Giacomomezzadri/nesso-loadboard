@@ -8,9 +8,11 @@ interface StatTileProps {
   hint?: string
   accent?: boolean
   icon?: ReactNode
+  /** Extra content under the value, e.g. a small breakdown table. */
+  footer?: ReactNode
 }
 
-export function StatTile({ label, value, unit, hint, accent, icon }: StatTileProps) {
+export function StatTile({ label, value, unit, hint, accent, icon, footer }: StatTileProps) {
   return (
     <div className={cn('flex flex-col gap-2 p-5', accent ? 'panel-accent glow-accent' : 'panel')}>
       <div className="flex items-center justify-between text-sm text-ink-secondary">
@@ -29,6 +31,7 @@ export function StatTile({ label, value, unit, hint, accent, icon }: StatTilePro
         {unit && <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{unit}</span>}
       </div>
       {hint && <p className="text-xs text-ink-muted">{hint}</p>}
+      {footer}
     </div>
   )
 }

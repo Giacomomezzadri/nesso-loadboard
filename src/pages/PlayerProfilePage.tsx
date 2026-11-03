@@ -14,9 +14,10 @@ import {
   mechanicalWork,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
+import { computePlayerAttendance } from '../lib/metrics/attendance'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { median } from '../lib/metrics/heatmap'
-import { formatNumber, isoWeek, mean } from '../lib/utils'
+import { formatNumber, formatPercent, isoWeek, mean } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { deletePlayerLink, proposePlayerLink, respondToPlayerLink } from '../lib/db/repo'
 import { useAuth } from '../state/AuthContext'
@@ -222,6 +223,16 @@ function PlayerLinkPanel({ playerId, canEdit }: { playerId: string; canEdit: boo
   )
 }
 
+function AttendanceRow({ label, detail, pct }: { label: string; detail: string; pct: number | null }) {
+  return (
+    <>
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="tabular-nums text-ink-secondary">{detail}</dd>
+      <dd className="text-right font-medium tabular-nums text-ink">{pct === null ? '—' : formatPercent(pct)}</dd>
+    </>
+  )
+}
+
 export function PlayerProfilePage() {
   const { data: players = [], isLoading: loadingPlayers } = usePlayersQuery()
   const { sessions, currentSession } = useCurrentSession()
@@ -342,6 +353,9 @@ export function PlayerProfilePage() {
   const periodHasMedian = chartData.some((d) => d.median !== null)
 
   const sessionCount = new Set(mergedSegments.map((s) => s.sessionId)).size
+  // Whole season, this workspace only — the un-merged sessions/allSegments, since the
+  // denominator is this team's own calendar, not a linked club's.
+  const attendance = activePlayerId ? computePlayerAttendance(activePlayerId, sessions, allSegments) : undefined
   // Weekly, not per-session: sum this player's distance within each calendar week, then
   // average those weekly totals — a session-count average would understate weeks with more
   // sessions and overstate quiet ones.
@@ -467,7 +481,31 @@ export function PlayerProfilePage() {
           )}
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatTile label="Sessioni" value={String(sessionCount)} />
+            <StatTile
+              label="Sessioni"
+              value={String(sessionCount)}
+              footer={
+                attendance && (
+                  <dl className="mt-1 grid grid-cols-[auto_auto_auto] gap-x-3 gap-y-1 text-xs">
+                    <AttendanceRow
+                      label="Allenamenti completi"
+                      detail={`${attendance.training.attended}/${attendance.training.total}`}
+                      pct={attendance.training.pct}
+                    />
+                    <AttendanceRow
+                      label="Presenze partite"
+                      detail={`${attendance.matches.attended}/${attendance.matches.total}`}
+                      pct={attendance.matches.pct}
+                    />
+                    <AttendanceRow
+                      label="Minutaggio"
+                      detail={`${formatNumber(attendance.minutes.playedSec / 60)}/${formatNumber(attendance.minutes.availableSec / 60)}′`}
+                      pct={attendance.minutes.pct}
+                    />
+                  </dl>
+                )
+              }
+            />
             <StatTile label="Distanza media settimanale" value={formatNumber(avgWeeklyDistance)} unit="m" />
             <StatTile
               label="Vmax storica"
