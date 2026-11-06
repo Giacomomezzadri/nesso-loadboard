@@ -1,5 +1,6 @@
 import { CalendarRange } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
+import { SimilarWeeksPanel } from '../components/charts/SimilarWeeksPanel'
 import { EmptyState } from '../components/ui/EmptyState'
 import { median } from '../lib/metrics/heatmap'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
@@ -55,19 +56,25 @@ export function SessionVSessionPage() {
   )
   const currentSegs = segments.filter((s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session')
 
+  const similarWeeks = <SimilarWeeksPanel sessions={sessions} segments={segments} players={players} settings={settings} />
+
   if (currentSegs.length === 0) {
     return (
-      <EmptyState
-        icon={CalendarRange}
-        title="Nessun dato per questa sessione"
-        description="Serve almeno una riga 'Full Session' in questa sessione."
-      />
+      <div className="flex flex-col gap-4">
+        {similarWeeks}
+        <EmptyState
+          icon={CalendarRange}
+          title="Nessun dato per questa sessione"
+          description="Serve almeno una riga 'Full Session' in questa sessione."
+        />
+      </div>
     )
   }
 
+  // The personal median only uses complete sessions: a Rehab day isn't representative of the player's normal load.
   const historyByPlayer = new Map<string, DrillSegment[]>()
   for (const seg of segments) {
-    if (seg.segmentKind === 'full_session' && sameTypeSessionIds.has(seg.sessionId)) {
+    if (seg.segmentKind === 'full_session' && !seg.isRehab && sameTypeSessionIds.has(seg.sessionId)) {
       const list = historyByPlayer.get(seg.playerId) ?? []
       list.push(seg)
       historyByPlayer.set(seg.playerId, list)
@@ -79,6 +86,7 @@ export function SessionVSessionPage() {
     position: playerById.get(seg.playerId)?.position ?? 'UNSPECIFIED',
     name: playerById.get(seg.playerId)?.displayName ?? seg.playerId,
     history: historyByPlayer.get(seg.playerId) ?? [],
+    rehab: !!seg.isRehab,
   }))
 
   const byPosition = new Map<Position, typeof rows>()
@@ -90,6 +98,7 @@ export function SessionVSessionPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {similarWeeks}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           {currentSession.type === 'training' && (
@@ -144,12 +153,27 @@ export function SessionVSessionPage() {
                 </tr>
                 {byPosition
                   .get(pos)!
-                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .sort((a, b) => Number(a.rehab) - Number(b.rehab) || a.name.localeCompare(b.name))
                   .map((row) => (
-                    <tr key={row.seg.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-2 font-medium text-ink">{row.name}</td>
+                    <tr key={row.seg.id} className={`border-b border-border last:border-0 ${row.rehab ? 'bg-status-critical/10' : ''}`}>
+                      <td className={`px-4 py-2 font-medium ${row.rehab ? 'text-status-critical' : 'text-ink'}`}>
+                        {row.name}
+                        {row.rehab && (
+                          <span className="ml-1.5 rounded-full bg-status-critical/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-status-critical">
+                            Rehab
+                          </span>
+                        )}
+                      </td>
                       {metrics.map((m) => {
                         const current = m.getValue(row.seg)
+                        if (row.rehab) {
+                          return (
+                            <td key={m.key} className="px-3 py-2 text-right tabular-nums text-status-critical">
+                              {current.toFixed(0)}
+                              <span className="ml-1 text-xs text-ink-muted">non confrontabile</span>
+                            </td>
+                          )
+                        }
                         const totalSessions = row.history.length + 1 // history + the one currently open
                         const enoughHistory = row.history.length >= MIN_COMPARABLE_HISTORY
                         const historyMedian = enoughHistory ? median(row.history.map(m.getValue)) : null
@@ -173,6 +197,12 @@ export function SessionVSessionPage() {
           </tbody>
         </table>
       </div>
+      {rows.some((r) => r.rehab) && (
+        <p className="text-xs text-status-critical">
+          Le righe in rosso sono giocatori in Rehab in questa sessione: il loro carico non viene confrontato con lo
+          storico. Le sessioni di Rehab sono sempre escluse dalle mediane personali.
+        </p>
+      )}
     </div>
   )
 }
