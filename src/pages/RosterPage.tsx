@@ -2,11 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { putPlayer } from '../lib/db/repo'
+import { matchAvailableSeconds, matchSecondsByPlayer } from '../lib/metrics/attendance'
 import { evaluatePlayerPb } from '../lib/metrics/pb'
+import { formatNumber } from '../lib/utils'
 import type { Player, Position } from '../types/domain'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useAuth } from '../state/AuthContext'
-import { queryKeys, usePlayersQuery } from '../state/queries'
+import { queryKeys, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery } from '../state/queries'
 
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
 
@@ -81,6 +83,8 @@ export function RosterPage() {
   const { data: players = [], isLoading } = usePlayersQuery()
   const { canEdit } = useAuth()
   const queryClient = useQueryClient()
+  const { data: sessions = [] } = useSessionsQuery()
+  const { data: segments = [] } = useAllSegmentsQuery()
 
   const updatePlayer = useMutation({
     mutationFn: (player: Player) => putPlayer(player),
@@ -88,6 +92,10 @@ export function RosterPage() {
   })
 
   if (isLoading) return null
+
+  // Whole season, this workspace's own matches — same figures as the Player Profile tile.
+  const matchSeconds = matchSecondsByPlayer(sessions, segments)
+  const availableMatchSec = matchAvailableSeconds(sessions, segments)
 
   if (players.length === 0) {
     return (
@@ -116,6 +124,7 @@ export function RosterPage() {
               <th className="px-4 py-2">Vmax personale</th>
               <th className="px-4 py-2">Sprint 10m (s)</th>
               <th className="px-4 py-2">Sprint 30m (s)</th>
+              <th className="px-4 py-2 text-right">Minuti partita</th>
               <th className="px-4 py-2">Attivo</th>
             </tr>
           </thead>
@@ -229,6 +238,14 @@ export function RosterPage() {
                       updatePlayer.mutate({ ...player, sprint30mSec: v, updatedAt: new Date().toISOString() })
                     }
                   />
+                </td>
+                <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-ink">
+                  {formatNumber((matchSeconds.get(player.id) ?? 0) / 60)}′
+                  {availableMatchSec > 0 && (
+                    <span className="ml-1 text-xs text-ink-muted">
+                      {formatNumber(((matchSeconds.get(player.id) ?? 0) / availableMatchSec) * 100)}%
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <input

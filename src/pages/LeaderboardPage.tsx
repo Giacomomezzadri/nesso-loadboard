@@ -23,6 +23,8 @@ interface MetricSpec {
   unit: string
   getValue: (s: DrillSegment) => number
   aggregate: 'sum' | 'max'
+  /** Computed on the period's matches only, whatever the type filter says. */
+  matchOnly?: boolean
 }
 
 /** Sourced from the Roster, not from GPS sessions — same value regardless of the period/type filter, always the latest figure entered in Roster & Positions. */
@@ -88,6 +90,7 @@ export function LeaderboardPage() {
     { key: 'sprints', label: 'Sprint', unit: '#', getValue: (s) => sprintCount(s, settings), aggregate: 'sum' },
     { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s) => mechanicalWork(s, settings), aggregate: 'sum' },
     { key: 'vmax', label: 'Velocità massima', unit: 'km/h', getValue: (s) => s.maxSpeedKmh, aggregate: 'max' },
+    { key: 'matchmin', label: 'Minuti giocati in partita', unit: 'min', getValue: (s) => s.durationSec / 60, aggregate: 'sum', matchOnly: true },
   ]
   // Figures from Roster & Positions — same for every player regardless of the period/type filter
   // below (always the latest value entered), unlike every GPS-derived metric above. Sprint times
@@ -146,8 +149,15 @@ export function LeaderboardPage() {
   const scopedSegs = segments.filter(
     (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
   )
+  const periodMatchIds = new Set(
+    sessions.filter((s) => s.type === 'match' && s.date >= effectiveStart && s.date <= effectiveEnd).map((s) => s.id),
+  )
+  const matchScopedSegs = segments.filter(
+    (s) => s.segmentKind === 'full_session' && periodMatchIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
+  )
+  const segsFor = (m: MetricSpec) => (m.matchOnly ? matchScopedSegs : scopedSegs)
 
-  if (!rosterMetric && scopedSegs.length === 0) {
+  if (!rosterMetric && segsFor(segmentMetric!).length === 0) {
     return (
       <EmptyState
         icon={Trophy}
@@ -172,7 +182,7 @@ export function LeaderboardPage() {
   } else {
     const metric = segmentMetric!
     const byPlayer = new Map<string, number[]>()
-    for (const seg of scopedSegs) {
+    for (const seg of segsFor(metric)) {
       const list = byPlayer.get(seg.playerId) ?? []
       list.push(metric.getValue(seg))
       byPlayer.set(seg.playerId, list)
@@ -215,7 +225,7 @@ export function LeaderboardPage() {
   // GPS-derived variables reuse the same period/mode-scoped segments as the leaderboard bars above;
   // anagraphic ones (height/weight) are constant per player, so the selected period doesn't apply to them.
   const scatterVariables: ScatterVarSpec[] = [
-    ...metrics.map((m) => ({ key: m.key, label: m.label, unit: m.unit, values: aggregateByPlayer(scopedSegs, m) })),
+    ...metrics.map((m) => ({ key: m.key, label: m.label, unit: m.unit, values: aggregateByPlayer(segsFor(m), m) })),
     {
       key: 'height',
       label: 'Altezza',
@@ -258,7 +268,8 @@ export function LeaderboardPage() {
         30m, Altezza, Peso) vengono invece da Roster &amp; Positions: sono <strong>indipendenti dal periodo
         selezionato</strong> e mostrano sempre il dato più recente inserito. Lo stesso vale per i{' '}
         <strong>test di salto</strong> (CMJ, Drop Jump), che usano l'ultimo test di ogni giocatore; le asimmetrie sono
-        ordinate dalla più bassa. Lo scatterplot in fondo mette a
+        ordinate dalla più bassa. <strong>Minuti giocati in partita</strong> segue il periodo scelto ma conta sempre
+        solo le partite, qualunque sia il filtro Training/Match. Lo scatterplot in fondo mette a
         confronto due variabili a scelta (anche altezza e peso) per individuare relazioni tra i giocatori.
       </div>
       <div className="flex flex-wrap items-center gap-3">

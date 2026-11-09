@@ -62,3 +62,36 @@ export function computePlayerAttendance(playerId: string, sessions: Session[], t
     minutes: { playedSec, availableSec, pct: availableSec > 0 ? (playedSec / availableSec) * 100 : null },
   }
 }
+
+/** Seconds each player was on the pitch across `sessions`' matches — one full session row per match, same rule as computePlayerAttendance. */
+export function matchSecondsByPlayer(sessions: Session[], teamSegments: DrillSegment[]): Map<string, number> {
+  const matchIds = new Set(sessions.filter((s) => s.type === 'match').map((s) => s.id))
+  const seen = new Set<string>()
+  const byPlayer = new Map<string, number>()
+  for (const seg of teamSegments) {
+    if (seg.segmentKind !== 'full_session' || !matchIds.has(seg.sessionId)) continue
+    const key = `${seg.sessionId}:${seg.playerId}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    byPlayer.set(seg.playerId, (byPlayer.get(seg.playerId) ?? 0) + seg.durationSec)
+  }
+  return byPlayer
+}
+
+/** Minutes on offer across `sessions`' matches: each match's longest recorded full session, summed (stoppage time included). */
+export function matchAvailableSeconds(sessions: Session[], teamSegments: DrillSegment[]): number {
+  const matchIds = new Set(sessions.filter((s) => s.type === 'match').map((s) => s.id))
+  const longest = new Map<string, number>()
+  for (const seg of teamSegments) {
+    if (seg.segmentKind !== 'full_session' || !matchIds.has(seg.sessionId)) continue
+    longest.set(seg.sessionId, Math.max(longest.get(seg.sessionId) ?? 0, seg.durationSec))
+  }
+  return [...longest.values()].reduce((sum, v) => sum + v, 0)
+}
+
+/** 1-based standing by match minutes among `playerIds` (most minutes = 1; ties share a place, 1-1-3). */
+export function matchMinutesRank(playerId: string, playerIds: string[], secondsByPlayer: Map<string, number>): { rank: number; of: number } {
+  const own = secondsByPlayer.get(playerId) ?? 0
+  const ahead = playerIds.filter((id) => (secondsByPlayer.get(id) ?? 0) > own).length
+  return { rank: ahead + 1, of: playerIds.length }
+}

@@ -15,7 +15,7 @@ import {
   mechanicalWork,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
-import { computePlayerAttendance } from '../lib/metrics/attendance'
+import { computePlayerAttendance, matchMinutesRank, matchSecondsByPlayer } from '../lib/metrics/attendance'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { median } from '../lib/metrics/heatmap'
 import { formatNumber, formatPercent, isoWeek, mean } from '../lib/utils'
@@ -359,6 +359,9 @@ export function PlayerProfilePage() {
   // Whole season, this workspace only — the un-merged sessions/allSegments, since the
   // denominator is this team's own calendar, not a linked club's.
   const attendance = activePlayerId ? computePlayerAttendance(activePlayerId, sessions, allSegments) : undefined
+  const minutesRank = activePlayerId
+    ? matchMinutesRank(activePlayerId, activeRosterPlayers.map((p) => p.id), matchSecondsByPlayer(sessions, allSegments))
+    : undefined
   // Weekly, not per-session: sum this player's distance within each calendar week, then
   // average those weekly totals — a session-count average would understate weeks with more
   // sessions and overstate quiet ones.
@@ -483,7 +486,7 @@ export function PlayerProfilePage() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <StatTile
               label="Sessioni"
               value={String(sessionCount)}
@@ -509,6 +512,29 @@ export function PlayerProfilePage() {
                 )
               }
             />
+            {attendance && minutesRank && (
+              <StatTile
+                label="Minuti in partita"
+                value={formatNumber(attendance.minutes.playedSec / 60)}
+                unit="min"
+                footer={
+                  <div className="flex flex-col gap-2 text-xs">
+                    <p className="tabular-nums text-ink-muted">
+                      su {formatNumber(attendance.minutes.availableSec / 60)}′ disponibili
+                      {attendance.minutes.pct !== null && (
+                        <span className="font-medium text-ink"> · {formatPercent(attendance.minutes.pct)}</span>
+                      )}
+                    </p>
+                    <p className="flex items-baseline gap-1.5 text-ink-muted">
+                      <span className="font-display text-xl font-bold tabular-nums leading-none text-ink">
+                        {minutesRank.rank}°
+                      </span>
+                      in squadra per minutaggio su {minutesRank.of}
+                    </p>
+                  </div>
+                }
+              />
+            )}
             <StatTile label="Distanza media settimanale" value={formatNumber(avgWeeklyDistance)} unit="m" />
             <StatTile
               label="Vmax storica"

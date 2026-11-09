@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
-import { mean } from '../lib/utils'
+import { cn, formatNumber, mean } from '../lib/utils'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import {
   MATCH_LOCATION_LABEL,
@@ -90,6 +90,32 @@ export function GameVGamePage() {
     segments.filter((s) => s.sessionId === sessionId && s.segmentKind === 'full_session' && !s.isRehab)
   const segsA = fullSegsForSession(matchA?.id)
   const segsB = fullSegsForSession(matchB?.id)
+
+  // Minutes per player in each match — team averages above mix full games and substitutes, so
+  // this is what tells a fitness drop apart from a 60th-minute substitution.
+  const playerNameById = new Map(players.map((p) => [p.id, p.displayName]))
+  const minutesIn = (sessionId: string | undefined) => {
+    const byPlayer = new Map<string, number>()
+    for (const s of segments) {
+      if (s.sessionId === sessionId && s.segmentKind === 'full_session' && !byPlayer.has(s.playerId)) {
+        byPlayer.set(s.playerId, s.durationSec / 60)
+      }
+    }
+    return { byPlayer, available: Math.max(0, ...byPlayer.values()) }
+  }
+  const minutesA = minutesIn(matchA?.id)
+  const minutesB = minutesIn(matchB?.id)
+  const minutesRows = [...new Set([...minutesA.byPlayer.keys(), ...minutesB.byPlayer.keys()])]
+    .map((id) => ({ id, name: playerNameById.get(id) ?? id, a: minutesA.byPlayer.get(id), b: minutesB.byPlayer.get(id) }))
+    .sort((x, y) => (y.a ?? -1) - (x.a ?? -1) || (y.b ?? -1) - (x.b ?? -1) || x.name.localeCompare(y.name))
+  const minutesCell = (min: number | undefined, available: number) => (
+    <td className={cn('px-3 py-1.5 text-right tabular-nums', min === undefined || min < available / 2 ? 'text-ink-muted' : 'text-ink')}>
+      {min === undefined ? '—' : `${formatNumber(min)}′`}
+      {min !== undefined && available > 0 && (
+        <span className="ml-1 text-xs text-ink-muted">{formatNumber((min / available) * 100)}%</span>
+      )}
+    </td>
+  )
 
   const groupKeyFor = (s: Session): string =>
     (groupBy === 'location' ? s.matchLocation : s.matchResult) ?? UNCLASSIFIED
@@ -185,6 +211,33 @@ export function GameVGamePage() {
                 referenceValue={mean(segsB.map(m.volume))}
               />
             ))}
+          </div>
+
+          <div className="panel overflow-x-auto">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4">
+              <p className="text-sm font-semibold text-ink">Minuti giocati</p>
+              <p className="text-xs text-ink-muted">
+                In grigio chi ha giocato meno di metà partita: le medie qui sopra mescolano partite intere e subentri.
+              </p>
+            </div>
+            <table className="mt-2 w-full whitespace-nowrap text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  <th className="px-4 py-2">Giocatore</th>
+                  <th className="px-3 py-2 text-right normal-case">{matchA?.label ?? 'Partita A'}</th>
+                  <th className="px-3 py-2 text-right normal-case">{matchB?.label ?? 'Partita B'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {minutesRows.map((row) => (
+                  <tr key={row.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-1.5 font-medium text-ink">{row.name}</td>
+                    {minutesCell(row.a, minutesA.available)}
+                    {minutesCell(row.b, minutesB.available)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

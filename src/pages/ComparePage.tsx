@@ -10,6 +10,7 @@ import {
   mechanicalWork,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
+import { matchAvailableSeconds } from '../lib/metrics/attendance'
 import { median } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
@@ -32,6 +33,8 @@ interface MetricSpec {
   unit: string
   aggregate: (segs: DrillSegment[]) => number
   format?: (v: number) => string
+  /** Computed on the period's matches only, whatever the type filter says. */
+  matchOnly?: boolean
 }
 
 const sumBy =
@@ -90,6 +93,11 @@ export function ComparePage() {
     (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
   )
 
+  const periodMatches = sessions.filter((s) => s.type === 'match' && s.date >= effectiveStart && s.date <= effectiveEnd)
+  const periodMatchIds = new Set(periodMatches.map((s) => s.id))
+  const matchSegs = segments.filter((s) => s.segmentKind === 'full_session' && periodMatchIds.has(s.sessionId))
+  const availableMatchMin = matchAvailableSeconds(periodMatches, matchSegs) / 60
+
   if (scopedSegs.length === 0) {
     return (
       <EmptyState
@@ -107,6 +115,15 @@ export function ComparePage() {
     segsByPlayer.set(seg.playerId, list)
   }
   const playersInScope = [...segsByPlayer.keys()]
+  const matchSegsByPlayer = new Map<string, DrillSegment[]>()
+  for (const seg of matchSegs) {
+    if (!activePlayerIds.has(seg.playerId)) continue
+    const list = matchSegsByPlayer.get(seg.playerId) ?? []
+    list.push(seg)
+    matchSegsByPlayer.set(seg.playerId, list)
+  }
+  const segsOf = (metric: MetricSpec, playerId: string) =>
+    (metric.matchOnly ? matchSegsByPlayer : segsByPlayer).get(playerId) ?? []
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -125,6 +142,14 @@ export function ComparePage() {
         { key: 'td', label: 'Distanza totale', unit: 'm', aggregate: sumBy((s) => s.totalDistanceM) },
         { key: 'tdmin', label: 'Distanza / min', unit: 'm/min', aggregate: ratePerMin((s) => s.totalDistanceM), format: (v) => v.toFixed(1) },
         { key: 'dur', label: 'Durata', unit: 'min', aggregate: sumBy((s) => s.durationSec / 60) },
+        {
+          key: 'matchmin',
+          label: 'Minuti in partita',
+          unit: 'min',
+          aggregate: sumBy((s) => s.durationSec / 60),
+          matchOnly: true,
+          format: (v) => (availableMatchMin > 0 ? `${v.toFixed(0)} · ${((v / availableMatchMin) * 100).toFixed(0)}%` : v.toFixed(0)),
+        },
       ],
     },
     {
@@ -174,6 +199,7 @@ export function ComparePage() {
         </div>
         <span className="text-xs text-ink-muted">
           I dati dei giorni selezionati vengono sommati (o presi al massimo/ricalcolati per le metriche al minuto).
+          «Minuti in partita» conta sempre solo le partite del periodo, con la % sui minuti disponibili.
         </span>
       </div>
 
@@ -223,7 +249,7 @@ export function ComparePage() {
               <p className="font-display mb-3 text-base font-medium text-ink">{section.title}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {section.metrics.map((metric) => {
-                  const allValues = playersInScope.map((playerId) => metric.aggregate(segsByPlayer.get(playerId)!))
+                  const allValues = playersInScope.map((playerId) => metric.aggregate(segsOf(metric, playerId)))
                   const teamMedian = median(allValues)
                   const format = metric.format ?? ((v: number) => v.toFixed(0))
                   const maxScale = Math.max(...allValues, 1)
@@ -233,7 +259,7 @@ export function ComparePage() {
                         {metric.label} {metric.unit && <span className="text-ink-muted">({metric.unit})</span>}
                       </p>
                       {selectedPlayerIds.map((playerId, i) => {
-                        const value = metric.aggregate(segsByPlayer.get(playerId)!)
+                        const value = metric.aggregate(segsOf(metric, playerId))
                         const rank = teamRank(value, allValues)
                         return (
                           <div key={playerId} className="flex items-center gap-2 text-xs">
@@ -247,7 +273,7 @@ export function ComparePage() {
                                 style={{ left: `${Math.min(100, (teamMedian / maxScale) * 100)}%` }}
                               />
                             </div>
-                            <span className="w-24 shrink-0 text-right tabular-nums text-ink">
+                            <span className="w-32 shrink-0 text-right tabular-nums text-ink">
                               {format(value)} <span className="text-ink-muted">({rank}°)</span>
                             </span>
                           </div>
