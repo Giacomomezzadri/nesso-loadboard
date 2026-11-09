@@ -1,8 +1,9 @@
 import type { AppData } from '../../_lib/auth'
 import { json, notFound } from '../../_lib/json'
 import type { Env } from '../../_lib/mappers'
+import { ensurePlayerStatusTable } from '../../_lib/playerStatuses'
 
-/** Deletes a session and cascades to its segments and RPE entries — D1 has no FK cascade configured. */
+/** Deletes a session and cascades to its segments, RPE entries and player statuses — D1 has no FK cascade configured. */
 export const onRequestDelete: PagesFunction<Env, string, AppData> = async ({ env, params, data }) => {
   const id = params.id as string
   const workspaceId = data.auth.workspaceId
@@ -12,7 +13,9 @@ export const onRequestDelete: PagesFunction<Env, string, AppData> = async ({ env
     .first<{ id: string }>()
   if (!existing) return notFound('session not found')
 
+  await ensurePlayerStatusTable(env)
   await env.DB.batch([
+    env.DB.prepare('DELETE FROM player_statuses WHERE session_id = ? AND workspace_id = ?').bind(id, workspaceId),
     env.DB.prepare('DELETE FROM segments WHERE session_id = ? AND workspace_id = ?').bind(id, workspaceId),
     env.DB.prepare('DELETE FROM rpe WHERE session_id = ? AND workspace_id = ?').bind(id, workspaceId),
     env.DB.prepare('DELETE FROM sessions WHERE id = ? AND workspace_id = ?').bind(id, workspaceId),

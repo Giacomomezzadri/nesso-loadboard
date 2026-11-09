@@ -13,6 +13,7 @@ import {
   listJumpTests,
   listPlannedDays,
   listPlayerAliases,
+  listPlayerStatuses,
 } from '../lib/db/repo'
 
 export const queryKeys = {
@@ -29,6 +30,7 @@ export const queryKeys = {
   plannedDays: (from: string, to: string) => ['calendar', from, to] as const,
   jumpTests: ['jump-tests'] as const,
   playerAliases: ['player-aliases'] as const,
+  playerStatuses: ['player-statuses'] as const,
 }
 
 export function useSessionsQuery() {
@@ -107,6 +109,10 @@ export function useInvalidateJumpTests() {
   }
 }
 
+export function usePlayerStatusesQuery() {
+  return useQuery({ queryKey: queryKeys.playerStatuses, queryFn: listPlayerStatuses })
+}
+
 export function usePlayerLinksQuery() {
   return useQuery({ queryKey: queryKeys.playerLinks, queryFn: listPlayerLinks })
 }
@@ -124,6 +130,7 @@ export function useInvalidateAfterImport() {
     queryClient.invalidateQueries({ queryKey: queryKeys.players })
     queryClient.invalidateQueries({ queryKey: ['segments'] })
     queryClient.invalidateQueries({ queryKey: ['rpe'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.playerStatuses })
   }
 }
 

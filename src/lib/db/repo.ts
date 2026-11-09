@@ -5,6 +5,8 @@ import type {
   PlannedDay,
   Player,
   PlayerAlias,
+  PlayerSessionStatus,
+  PlayerStatusEntry,
   RpeEntry,
   Session,
 } from '../../types/domain'
@@ -149,6 +151,18 @@ export async function listPlayerAliases(): Promise<PlayerAlias[]> {
 /** Saves an import's tests together with the name pairings made by hand during it. */
 export async function putJumpTests(tests: JumpTest[], aliases: PlayerAlias[]): Promise<void> {
   await apiFetch('/api/jump-tests/bulk', { method: 'POST', body: JSON.stringify({ tests, aliases }) })
+}
+
+export async function listPlayerStatuses(): Promise<PlayerStatusEntry[]> {
+  return apiFetch<PlayerStatusEntry[]>('/api/player-statuses')
+}
+
+/** Replaces one session's editor-set player statuses. */
+export async function putPlayerStatuses(
+  sessionId: string,
+  statuses: { playerId: string; status: PlayerSessionStatus }[],
+): Promise<void> {
+  await apiFetch('/api/player-statuses/bulk', { method: 'POST', body: JSON.stringify({ sessionId, statuses }) })
 }
 
 // ---------- auth ----------

@@ -1,5 +1,5 @@
-import type { DrillSegment, MatchLocation, MatchResult, Player, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
-import { listPlayers, putPlayer, putRpeEntries, putSegments, putSession } from '../db/repo'
+import type { DrillSegment, MatchLocation, MatchResult, Player, PlayerSessionStatus, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
+import { listPlayers, putPlayer, putPlayerStatuses, putRpeEntries, putSegments, putSession } from '../db/repo'
 import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
 import { reconcileRows } from './reconcile'
@@ -77,7 +77,12 @@ export async function stageImport(fileText: string, fileName: string, metadata: 
 }
 
 /** Persist a staged import (and any RPE entered for it), then reconcile PB references. */
-export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<string, number>): Promise<Session> {
+export async function commitImport(
+  staged: StagedImport,
+  rpeByPlayerId: Record<string, number>,
+  /** The editor's choice for each active roster player missing from the export. */
+  missingPlayerStatuses: { playerId: string; status: PlayerSessionStatus }[] = [],
+): Promise<Session> {
   const now = new Date().toISOString()
   const session: Session = {
     id: staged.sessionId,
@@ -97,6 +102,7 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
 
   await putSession(session)
   await putSegments(staged.segments)
+  if (missingPlayerStatuses.length > 0) await putPlayerStatuses(session.id, missingPlayerStatuses)
 
   const rpeEntries = buildRpeEntries(session.id, staged.segments, rpeByPlayerId)
   if (rpeEntries.length > 0) {

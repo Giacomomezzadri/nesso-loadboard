@@ -1,6 +1,7 @@
 import { ArrowRight, ShieldCheck, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { WeekStatusGrid } from '../components/attendance/WeekStatusGrid'
 import { PlanningCalendar } from '../components/calendar/PlanningCalendar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
@@ -169,6 +170,8 @@ export function OverviewPage() {
       </div>
 
       <PlanningCalendar sessions={sessions} canEdit={canEdit} />
+
+      <WeekStatusGrid sessions={sessions} segments={allSegments} players={players} />
 
       {microcycleByPlayer.length > 0 && (
         <div className="panel p-4">

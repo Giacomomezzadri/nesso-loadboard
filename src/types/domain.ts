@@ -115,6 +115,48 @@ export interface PlayerAlias {
   playerId: string
 }
 
+/**
+ * A player's situation in one session. `present`/`rehab` come from the GPS export (a
+ * full-session row, Rehab-flagged or not); the rest are picked by the editor at import time
+ * for active roster players with no GPS data.
+ */
+export type PlayerSessionStatus =
+  | 'present'
+  | 'rehab'
+  | 'absent'
+  | 'gym'
+  | 'national_team'
+  | 'not_called'
+  | 'unavailable'
+  | 'unused'
+  | 'other_team'
+
+/** The choices offered for a player with no GPS data, by session type. */
+export const MISSING_PLAYER_STATUSES: Record<SessionType, PlayerSessionStatus[]> = {
+  training: ['absent', 'gym', 'other_team', 'national_team'],
+  match: ['not_called', 'unavailable', 'other_team', 'unused'],
+}
+
+export const PLAYER_STATUS_LABEL: Record<PlayerSessionStatus, string> = {
+  present: 'Presente',
+  rehab: 'Rehab',
+  absent: 'Assente',
+  gym: 'Palestra',
+  national_team: 'Nazionale',
+  not_called: 'Non convocato',
+  unavailable: 'Indisponibile',
+  unused: 'Non utilizzato',
+  other_team: 'Altra squadra',
+}
+
+/** An editor-set situation, stored per session and player (GPS-derived ones aren't stored). */
+export interface PlayerStatusEntry {
+  sessionId: string
+  playerId: string
+  status: PlayerSessionStatus
+  updatedAt: string
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string

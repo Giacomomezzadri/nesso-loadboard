@@ -7,10 +7,13 @@ import {
   buildMatchLabel,
   MATCH_LOCATION_LABEL,
   MATCH_RESULT_LABEL,
+  MISSING_PLAYER_STATUSES,
+  PLAYER_STATUS_LABEL,
   TRAINING_TYPE_LABEL,
   type MatchLocation,
   type MatchResult,
   type Player,
+  type PlayerSessionStatus,
   type SessionType,
   type TrainingType,
 } from '../types/domain'
@@ -61,6 +64,9 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [staged, setStaged] = useState<StagedImport | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
+  // Active roster players the export has no data for — the editor says why for each one.
+  const [missingPlayers, setMissingPlayers] = useState<Player[]>([])
+  const [statusByPlayerId, setStatusByPlayerId] = useState<Record<string, PlayerSessionStatus>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -98,6 +104,13 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
       const allPlayers = await listPlayers()
       const involvedIds = new Set(result.segments.map((s) => s.playerId))
       setPlayers(allPlayers.filter((p) => involvedIds.has(p.id)))
+      setMissingPlayers(
+        allPlayers
+          .filter((p) => p.active && !involvedIds.has(p.id))
+          .sort((a, b) => a.displayName.localeCompare(b.displayName)),
+      )
+      // The choices differ between training and match, so start over whenever the session is re-staged.
+      setStatusByPlayerId({})
       setStep('rpe')
     } catch (err) {
       if (err instanceof CsvImportError) {
@@ -110,12 +123,18 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
     }
   }
 
+  const unresolvedMissing = missingPlayers.filter((p) => !statusByPlayerId[p.id]).length
+
   async function handleFinish() {
-    if (!staged) return
+    if (!staged || unresolvedMissing > 0) return
     setSaving(true)
     setSaveError(null)
     try {
-      const session = await commitImport(staged, rpeByPlayerId)
+      const session = await commitImport(
+        staged,
+        rpeByPlayerId,
+        missingPlayers.map((p) => ({ playerId: p.id, status: statusByPlayerId[p.id] })),
+      )
       invalidate()
       setCurrentSessionId(session.id)
       setStep('done')
@@ -278,6 +297,21 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
             </div>
           )}
 
+          <AttendancePanel
+            sessionType={staged.metadata.type}
+            segments={staged.segments}
+            players={players}
+            missingPlayers={missingPlayers}
+            statusByPlayerId={statusByPlayerId}
+            onChange={(playerId, status) => setStatusByPlayerId((prev) => ({ ...prev, [playerId]: status }))}
+            onSetAll={(status) =>
+              setStatusByPlayerId((prev) => ({
+                ...prev,
+                ...Object.fromEntries(missingPlayers.filter((p) => !prev[p.id]).map((p) => [p.id, status])),
+              }))
+            }
+          />
+
           <div className="panel p-5">
             <p className="mb-3 text-sm text-ink-secondary">
               RPE opzionale (scala 1-10) per calcolare lo sRPE — puoi saltare e inserirlo più tardi.
@@ -311,6 +345,13 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
             </div>
           )}
 
+          {unresolvedMissing > 0 && (
+            <p className="text-right text-xs text-status-serious">
+              Indica la situazione di {unresolvedMissing === 1 ? '1 giocatore' : `${unresolvedMissing} giocatori`} senza dati
+              GPS per salvare.
+            </p>
+          )}
+
           <div className="flex justify-between">
             <button
               type="button"
@@ -321,7 +362,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
             </button>
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || unresolvedMissing > 0}
               onClick={handleFinish}
               className="flex items-center gap-1 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
             >
@@ -351,11 +392,118 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   )
 }
 
+/**
+ * Who was there: GPS rows say Present (or Rehab, from the drill title); every active roster
+ * player missing from the export needs a reason picked by the editor.
+ */
+function AttendancePanel({
+  sessionType,
+  segments,
+  players,
+  missingPlayers,
+  statusByPlayerId,
+  onChange,
+  onSetAll,
+}: {
+  sessionType: SessionType
+  segments: StagedImport['segments']
+  players: Player[]
+  missingPlayers: Player[]
+  statusByPlayerId: Record<string, PlayerSessionStatus>
+  onChange: (playerId: string, status: PlayerSessionStatus) => void
+  /** Fills only the players not chosen yet. */
+  onSetAll: (status: PlayerSessionStatus) => void
+}) {
+  const options = MISSING_PLAYER_STATUSES[sessionType]
+  const rehabIds = new Set(
+    sessionType === 'training'
+      ? segments.filter((s) => s.segmentKind === 'full_session' && s.isRehab).map((s) => s.playerId)
+      : [],
+  )
+  const nameById = new Map(players.map((p) => [p.id, p.displayName]))
+  const rehabNames = [...rehabIds].map((id) => nameById.get(id) ?? id)
+  // From the export itself — a first-time player isn't in the roster yet but is still present.
+  const presentCount = new Set(segments.map((s) => s.playerId)).size - rehabIds.size
+
+  return (
+    <div className="panel flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium text-ink">Presenze</span>
+        <span className="rounded-full bg-status-good/15 px-2 py-0.5 text-xs font-medium text-status-good">
+          {presentCount} {presentCount === 1 ? 'presente' : 'presenti'}
+        </span>
+        {rehabNames.length > 0 && (
+          <span className="rounded-full bg-status-critical/15 px-2 py-0.5 text-xs font-medium text-status-critical">
+            {rehabNames.length} Rehab: {rehabNames.join(', ')}
+          </span>
+        )}
+        <span className="text-xs text-ink-muted">dai dati GPS</span>
+      </div>
+
+      {missingPlayers.length === 0 ? (
+        <p className="text-xs text-ink-muted">Tutti i giocatori attivi del roster hanno dati GPS in questa sessione.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm text-ink-secondary">
+              {missingPlayers.length === 1 ? '1 giocatore attivo' : `${missingPlayers.length} giocatori attivi`} senza
+              dati GPS: indica la situazione.
+            </p>
+            <span className="flex flex-wrap items-center gap-1 text-xs text-ink-muted">
+              Imposta i rimanenti:
+              {options.map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => onSetAll(o)}
+                  className="rounded-md border border-border px-2 py-0.5 text-ink-secondary hover:bg-ink/5 hover:text-ink"
+                >
+                  {PLAYER_STATUS_LABEL[o]}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div className="flex max-h-80 flex-col divide-y divide-border/60 overflow-y-auto">
+            {missingPlayers.map((p) => (
+              <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                <span className={`text-sm ${statusByPlayerId[p.id] ? 'text-ink' : 'font-medium text-status-serious'}`}>
+                  {p.displayName}
+                </span>
+                <div className="flex flex-wrap gap-1" role="radiogroup" aria-label={`Situazione di ${p.displayName}`}>
+                  {options.map((o) => {
+                    const selected = statusByPlayerId[p.id] === o
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => onChange(p.id, o)}
+                        className={`rounded-md border px-2 py-0.5 text-xs font-medium ${
+                          selected
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-ink-secondary hover:bg-ink/5 hover:text-ink'
+                        }`}
+                      >
+                        {PLAYER_STATUS_LABEL[o]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function StepHeader({ step }: { step: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: 'select', label: 'File' },
     { key: 'metadata', label: 'Sessione' },
-    { key: 'rpe', label: 'RPE' },
+    { key: 'rpe', label: 'Presenze e RPE' },
     { key: 'done', label: 'Fatto' },
   ]
   const currentIndex = steps.findIndex((s) => s.key === step)
