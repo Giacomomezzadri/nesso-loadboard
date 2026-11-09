@@ -1,5 +1,6 @@
 import { Flag } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useReportSection } from '../components/report/ReportSection'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
@@ -48,6 +49,7 @@ export function GameVGamePage() {
   const [matchAId, setMatchAId] = useState<string | undefined>(undefined)
   const [matchBId, setMatchBId] = useState<string | undefined>(undefined)
   const [groupBy, setGroupBy] = useState<GroupBy>('location')
+  const { inReport, show } = useReportSection()
 
   const matchSessions = useMemo(
     () => sessions.filter((s) => s.type === 'match').sort((a, b) => b.date.localeCompare(a.date)),
@@ -147,11 +149,11 @@ export function GameVGamePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm text-ink-secondary">
+      <p className={inReport ? 'hidden' : 'text-sm text-ink-secondary'}>
         Confronta due partite testa a testa, oppure aggrega lo storico per sede o per esito.
       </p>
 
-      {matchSessions.length < 2 ? (
+      {(show('head_to_head') || show('minutes')) && (matchSessions.length < 2 ? (
         <EmptyState
           icon={Flag}
           title="Serve almeno una seconda partita"
@@ -196,6 +198,7 @@ export function GameVGamePage() {
             </div>
           </div>
 
+          {show('head_to_head') && (
           <div className="grid grid-cols-1 gap-4 panel p-5 md:grid-cols-2">
             <div className="md:col-span-2">
               <p className="mb-3 text-sm font-semibold text-ink">Partita vs Partita — media squadra</p>
@@ -212,7 +215,9 @@ export function GameVGamePage() {
               />
             ))}
           </div>
+          )}
 
+          {show('minutes') && (
           <div className="panel overflow-x-auto">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4">
               <p className="text-sm font-semibold text-ink">Minuti giocati</p>
@@ -239,9 +244,11 @@ export function GameVGamePage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
-      )}
+      ))}
 
+      {show('by_group') && (
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-ink">Confronto per tipologia — media squadra</p>
@@ -292,6 +299,7 @@ export function GameVGamePage() {
           </table>
         </div>
       </div>
+      )}
     </div>
   )
 }

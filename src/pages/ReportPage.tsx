@@ -75,7 +75,8 @@ export function ReportPage() {
         </div>
       </div>
       <p className="no-print -mt-2 text-xs text-ink-muted">
-        Nella finestra di stampa scegli «Salva come PDF». Viene stampato quello che vedi qui sotto.
+        Nella finestra di stampa scegli «Salva come PDF». Viene stampato quello che vedi qui sotto: i blocchi legati a
+        una sessione usano quella selezionata in alto, e in ogni blocco puoi scegliere giocatore, periodo o metrica.
       </p>
 
       <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-primary pb-2">

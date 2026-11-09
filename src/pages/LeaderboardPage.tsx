@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react'
 import { useState } from 'react'
 import { PlayerScatterChart, type ScatterPoint } from '../components/charts/PlayerScatterChart'
+import { useReportSection } from '../components/report/ReportSection'
 import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import { JUMP_TESTS, latestTestByPlayer } from '../lib/metrics/jumpTests'
@@ -76,6 +77,7 @@ export function LeaderboardPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [xVarKey, setXVarKey] = useState('td')
   const [yVarKey, setYVarKey] = useState('vmax')
+  const { inReport, show } = useReportSection()
 
   if (!currentSession || isLoading || !settings) return null
 
@@ -262,7 +264,7 @@ export function LeaderboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-md border border-border bg-surface p-3 text-sm text-ink-secondary">
+      <div className={inReport ? 'hidden' : 'rounded-md border border-border bg-surface p-3 text-sm text-ink-secondary'}>
         Classifica dei giocatori attivi in base alla metrica scelta. Le metriche GPS sono calcolate sul periodo e
         sul tipo di sessione selezionati. Le metriche contrassegnate con <strong>*</strong> (Sprint 10m, Sprint
         30m, Altezza, Peso) vengono invece da Roster &amp; Positions: sono <strong>indipendenti dal periodo
@@ -326,6 +328,7 @@ export function LeaderboardPage() {
         </div>
       </div>
 
+      {show('ranking') && (
       <div className="panel p-4">
         <div className="flex flex-col gap-2">
           {rows.map((row, i) => (
@@ -349,7 +352,9 @@ export function LeaderboardPage() {
           ))}
         </div>
       </div>
+      )}
 
+      {show('scatter') && (
       <div className="panel p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="font-display text-base font-medium text-ink">Scatterplot</p>
@@ -396,6 +401,7 @@ export function LeaderboardPage() {
           />
         )}
       </div>
+      )}
     </div>
   )
 }

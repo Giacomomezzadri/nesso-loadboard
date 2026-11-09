@@ -1,6 +1,7 @@
 import { CalendarRange } from 'lucide-react'
 import { Fragment, useMemo, useState } from 'react'
 import { SimilarWeeksPanel } from '../components/charts/SimilarWeeksPanel'
+import { useReportSection } from '../components/report/ReportSection'
 import { EmptyState } from '../components/ui/EmptyState'
 import { median } from '../lib/metrics/heatmap'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
@@ -33,6 +34,7 @@ export function SessionVSessionPage() {
   // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
   const segments = useMemo(() => rawSegments.filter((s) => activePlayerIds.has(s.playerId)), [rawSegments, activePlayerIds])
   const [includeAllTrainingTypes, setIncludeAllTrainingTypes] = useState(false)
+  const { inReport, show } = useReportSection()
 
   if (!currentSession || isLoading || !settings) return null
 
@@ -56,7 +58,10 @@ export function SessionVSessionPage() {
   )
   const currentSegs = segments.filter((s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session')
 
-  const similarWeeks = <SimilarWeeksPanel sessions={sessions} segments={segments} players={players} settings={settings} />
+  const similarWeeks = show('similar_weeks') ? (
+    <SimilarWeeksPanel sessions={sessions} segments={segments} players={players} settings={settings} />
+  ) : null
+  if (inReport && !show('table')) return similarWeeks
 
   if (currentSegs.length === 0) {
     return (

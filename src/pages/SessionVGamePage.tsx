@@ -2,6 +2,7 @@ import { Link2, Swords } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
+import { useReportSection } from '../components/report/ReportSection'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
 import { currentMicrocycleSessions } from '../lib/metrics/microcycle'
 import { performanceModelAverage } from '../lib/metrics/performanceModel'
@@ -64,6 +65,9 @@ export function SessionVGamePage() {
     [sessions],
   )
   const matchSessionIds = useMemo(() => new Set(sessions.filter((s) => s.type === 'match').map((s) => s.id)), [sessions])
+  const { inReport, show } = useReportSection()
+  // In a report block the block itself picks the chart; on the page the chips below do.
+  const chartVisible = (kind: ChartKind) => (inReport ? show(kind) : selectedKinds.includes(kind))
 
   if (isLoading || !settings) return null
 
@@ -208,7 +212,7 @@ export function SessionVGamePage() {
         </p>
       </div>
 
-      <div>
+      <div className={inReport ? 'hidden' : undefined}>
         <p className="mb-2 text-sm font-medium text-ink-secondary">Grafici da visualizzare</p>
         <div className="flex flex-wrap gap-2">
           {CHART_KIND_ORDER.map((kind) => {
@@ -231,12 +235,12 @@ export function SessionVGamePage() {
         </div>
       </div>
 
-      <p className="text-sm text-ink-secondary">
+      <p className={inReport ? 'hidden' : 'text-sm text-ink-secondary'}>
         Allenamento selezionato confrontato con la media di {matchCount} {matchCount === 1 ? 'partita' : 'partite'} —
         media squadra e ogni giocatore, uno accanto all'altro.
       </p>
 
-      {selectedKinds.length === 0 ? (
+      {!inReport && selectedKinds.length === 0 ? (
         <EmptyState
           icon={Swords}
           title="Nessun grafico selezionato"
@@ -244,7 +248,7 @@ export function SessionVGamePage() {
         />
       ) : (
         <>
-          {selectedKinds.includes('training-vs-game') && (
+          {chartVisible('training-vs-game') && (
             <section className="flex flex-col gap-4">
               <div>
                 <p className="text-sm font-semibold text-ink">Allenamento vs Gara</p>
@@ -281,7 +285,7 @@ export function SessionVGamePage() {
             </section>
           )}
 
-          {selectedKinds.includes('intensity') && (
+          {chartVisible('intensity') && (
             <section className="flex flex-col gap-4">
               <p className="text-sm font-semibold text-ink">Intensità (per minuto)</p>
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -313,7 +317,7 @@ export function SessionVGamePage() {
             </section>
           )}
 
-          {selectedKinds.includes('weekly-model') && (
+          {chartVisible('weekly-model') && (
             <section className="flex flex-col gap-4">
               <div>
                 <p className="text-sm font-semibold text-ink">Modello prestativo settimanale</p>
@@ -358,6 +362,7 @@ export function SessionVGamePage() {
             </section>
           )}
 
+          {show('drills') && (
           <div>
             <p className="mb-3 text-sm font-semibold text-ink">
               Riepilogo per drill (media squadra) — {activeTraining.label}
@@ -407,6 +412,7 @@ export function SessionVGamePage() {
               </table>
             </div>
           </div>
+          )}
         </>
       )}
     </div>

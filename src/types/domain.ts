@@ -335,8 +335,45 @@ export interface AppSettings {
   reportTemplates?: ReportTemplate[]
 }
 
-/** Every kind of block a report can contain; add a kind here and in lib/reports/catalog.ts. */
-export type ReportBlockKind = 'week_attendance'
+/**
+ * Every kind of block a report can contain; add a kind here and in lib/reports/catalog.ts.
+ * "page.section" kinds render that section of the page (see components/report/ReportSection.tsx).
+ */
+export type ReportBlockKind =
+  | 'week_attendance'
+  | 'overview.summary'
+  | 'overview.alerts'
+  | 'overview.calendar'
+  | 'overview.microcycle'
+  | 'dynamic.td'
+  | 'dynamic.hsr'
+  | 'dynamic.sprint'
+  | 'dynamic.mechw'
+  | 'dynamic.microcycle'
+  | 'svg.training-vs-game'
+  | 'svg.intensity'
+  | 'svg.weekly-model'
+  | 'svg.drills'
+  | 'svs.similar_weeks'
+  | 'svs.table'
+  | 'gvg.head_to_head'
+  | 'gvg.minutes'
+  | 'gvg.by_group'
+  | 'drills.heatmap'
+  | 'compare.volume'
+  | 'compare.high_speed'
+  | 'compare.mechanical'
+  | 'profile.tiles'
+  | 'profile.jump_tests'
+  | 'profile.alerts'
+  | 'profile.microcycle'
+  | 'profile.weekly_model'
+  | 'profile.trend'
+  | 'profile.history'
+  | 'alerts.table'
+  | 'leaderboard.ranking'
+  | 'leaderboard.scatter'
+  | 'roster.table'
 
 /** One block in a report template, with its own options (unused ones are simply ignored by a kind). */
 export interface ReportBlock {

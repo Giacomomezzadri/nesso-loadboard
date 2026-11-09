@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { REPORT_BLOCK_KINDS, REPORT_BLOCKS, newReportBlock } from '../../lib/reports/catalog'
+import { REPORT_BLOCK_GROUPS, REPORT_BLOCK_KINDS, REPORT_BLOCKS, newReportBlock } from '../../lib/reports/catalog'
 import { cn } from '../../lib/utils'
 import type { Position, ReportBlock, ReportBlockKind, ReportTemplate } from '../../types/domain'
 
@@ -44,7 +44,7 @@ function BlockRow({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium text-ink">
-            {index + 1}. {def.label}
+            {index + 1}. {def.label} <span className="font-normal text-ink-muted">· {def.group}</span>
           </p>
           <p className="text-xs text-ink-muted">{def.description}</p>
         </div>
@@ -188,10 +188,14 @@ export function ReportTemplatesEditor({
               onChange={(e) => setNewKind(e.target.value as ReportBlockKind)}
               className="rounded-md border border-border bg-page px-3 py-1.5 text-sm text-ink"
             >
-              {REPORT_BLOCK_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {REPORT_BLOCKS[k].label}
-                </option>
+              {REPORT_BLOCK_GROUPS.map(({ group, kinds }) => (
+                <optgroup key={group} label={group}>
+                  {kinds.map((k) => (
+                    <option key={k} value={k}>
+                      {REPORT_BLOCKS[k].label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             <button

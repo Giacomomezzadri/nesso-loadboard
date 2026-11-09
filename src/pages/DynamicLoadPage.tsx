@@ -1,6 +1,7 @@
 import { BarChart3 } from 'lucide-react'
 import { MetricTrendPanel } from '../components/charts/MetricTrendPanel'
 import { MicrocycleBarChart, type MicrocycleBarChartGroup } from '../components/charts/MicrocycleBarChart'
+import { useReportSection } from '../components/report/ReportSection'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
@@ -29,6 +30,7 @@ export function DynamicLoadPage() {
   const { data: rawSegments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { inReport, show } = useReportSection()
 
   if (loadingSessions || loadingSegments || !settings) return null
 
@@ -64,11 +66,11 @@ export function DynamicLoadPage() {
     }))
 
   const panels = [
-    { title: 'Distanza totale', unit: 'm', points: buildPoints((s) => s.totalDistanceM) },
-    { title: 'Distanza > 19.8 km/h', unit: 'm', points: buildPoints(distanceAbove19_8) },
-    { title: 'Distanza > 25.2 km/h', unit: 'm', points: buildPoints(distanceAbove25_2) },
-    { title: 'Mechanical Work', unit: '#', points: buildPoints((s) => mechanicalWork(s, settings)) },
-  ]
+    { key: 'td', title: 'Distanza totale', unit: 'm', points: buildPoints((s) => s.totalDistanceM) },
+    { key: 'hsr', title: 'Distanza > 19.8 km/h', unit: 'm', points: buildPoints(distanceAbove19_8) },
+    { key: 'sprint', title: 'Distanza > 25.2 km/h', unit: 'm', points: buildPoints(distanceAbove25_2) },
+    { key: 'mechw', title: 'Mechanical Work', unit: '#', points: buildPoints((s) => mechanicalWork(s, settings)) },
+  ].filter((panel) => show(panel.key))
 
   const singleSession = sessions.length === 1
 
@@ -112,19 +114,19 @@ export function DynamicLoadPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-secondary">
+      <p className={inReport && panels.length === 0 ? 'hidden' : 'text-sm text-ink-secondary'}>
         Media squadra per sessione ({sorted.length} {sorted.length === 1 ? 'sessione' : 'sessioni'} in archivio) — linea:
         media mobile su finestra di {settings.rollingWindowDays} giorni.
       </p>
 
-      {singleSession && (
+      {singleSession && !inReport && (
         <div className="rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-ink-secondary">
           Con una sola sessione la media mobile coincide con il singolo valore — importa più sessioni nel tempo per
           vedere un vero trend.
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className={inReport ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 gap-4 lg:grid-cols-2'}>
         {panels.map((panel) => {
           const rolling = rollingAverageByDateWindow(panel.points, settings.rollingWindowDays)
           const last = panel.points[panel.points.length - 1]
@@ -141,7 +143,7 @@ export function DynamicLoadPage() {
         })}
       </div>
 
-      {microcycleRows.length > 0 && (
+      {show('microcycle') && microcycleRows.length > 0 && (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-ink-secondary">
             Per giocatore: allenamenti svolti dall'ultima partita a oggi, e ogni metrica di carico come % rispetto a

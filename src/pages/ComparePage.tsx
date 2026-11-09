@@ -1,5 +1,6 @@
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { useReportSection } from '../components/report/ReportSection'
 import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import {
@@ -73,6 +74,7 @@ export function ComparePage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const { inReport, show } = useReportSection()
 
   const playerById = new Map(players.map((p) => [p.id, p]))
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
@@ -135,8 +137,9 @@ export function ComparePage() {
 
   const selectedPlayerIds = selectedIds.filter((id) => segsByPlayer.has(id))
 
-  const sections: { title: string; metrics: MetricSpec[] }[] = [
+  const sections: { key: string; title: string; metrics: MetricSpec[] }[] = [
     {
+      key: 'volume',
       title: 'Volume',
       metrics: [
         { key: 'td', label: 'Distanza totale', unit: 'm', aggregate: sumBy((s) => s.totalDistanceM) },
@@ -153,6 +156,7 @@ export function ComparePage() {
       ],
     },
     {
+      key: 'high_speed',
       title: 'Alta velocità',
       metrics: [
         { key: 'hsr', label: 'HSR (>19.8 km/h)', unit: 'm', aggregate: sumBy(distanceAbove19_8) },
@@ -162,6 +166,7 @@ export function ComparePage() {
       ],
     },
     {
+      key: 'mechanical',
       title: 'Meccanico',
       metrics: [
         { key: 'mechw', label: 'Mechanical Work', unit: '#', aggregate: sumBy((s) => mechanicalWork(s, settings)) },
@@ -224,7 +229,7 @@ export function ComparePage() {
             )
           })}
         </div>
-        <p className="mt-2 text-xs text-ink-muted">
+        <p className={inReport ? 'hidden' : 'mt-2 text-xs text-ink-muted'}>
           Il confronto si ferma a tre giocatori per scelta: sono i colori che restano distinguibili anche con
           daltonismo.
         </p>
@@ -244,7 +249,7 @@ export function ComparePage() {
             <span className="text-ink-muted">La riga grigia sulle barre è la mediana squadra (n={playersInScope.length})</span>
           </div>
 
-          {sections.map((section) => (
+          {sections.filter((section) => show(section.key)).map((section) => (
             <div key={section.title} className="panel p-4">
               <p className="font-display mb-3 text-base font-medium text-ink">{section.title}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -7,6 +7,7 @@ import { JumpTestsPanel } from '../components/jump/JumpTestsPanel'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
+import { useReportSection } from '../components/report/ReportSection'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import {
   distanceAbove19_8,
@@ -244,6 +245,7 @@ export function PlayerProfilePage() {
   const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
   const { data: jumpTests = [] } = useJumpTestsQuery()
   const { canEdit } = useAuth()
+  const { inReport, show } = useReportSection()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [trendMetricKey, setTrendMetricKey] = useState('td')
   // Session ids excluded from the trend line above — everything is included by default,
@@ -469,7 +471,7 @@ export function PlayerProfilePage() {
         )}
       </div>
 
-      {activePlayerId && <PlayerLinkPanel playerId={activePlayerId} canEdit={canEdit} />}
+      {!inReport && activePlayerId && <PlayerLinkPanel playerId={activePlayerId} canEdit={canEdit} />}
 
       {loadingSegments ? null : sessionCount === 0 ? (
         <EmptyState
@@ -486,6 +488,7 @@ export function PlayerProfilePage() {
             </p>
           )}
 
+          {show('tiles') && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <StatTile
               label="Sessioni"
@@ -545,10 +548,11 @@ export function PlayerProfilePage() {
             />
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
+          )}
 
-          {activePlayerId && <JumpTestsPanel playerId={activePlayerId} tests={jumpTests} activePlayerIds={activePlayerIdSet} />}
+          {show('jump_tests') && activePlayerId && <JumpTestsPanel playerId={activePlayerId} tests={jumpTests} activePlayerIds={activePlayerIdSet} />}
 
-          {currentSession && (
+          {show('alerts') && currentSession && (
             <div className="panel p-4">
               <p className="font-display mb-1 text-base font-medium text-ink">Alert — {currentSession.label}</p>
               <p className="mb-3 text-xs text-ink-muted">
@@ -575,7 +579,7 @@ export function PlayerProfilePage() {
             </div>
           )}
 
-          {microcycleRows.length > 0 && (
+          {show('microcycle') && microcycleRows.length > 0 && (
             <div className="panel p-4">
               <p className="font-display mb-1 text-base font-medium text-ink">Completamento microciclo attuale</p>
               <p className="mb-3 text-xs text-ink-muted">
@@ -605,7 +609,7 @@ export function PlayerProfilePage() {
             </div>
           )}
 
-          {weeklyModelRows.length > 0 && (
+          {show('weekly_model') && weeklyModelRows.length > 0 && (
             <div className="panel p-4">
               <p className="font-display mb-1 text-base font-medium text-ink">Modello prestativo settimanale</p>
               <p className="mb-3 text-xs text-ink-muted">
@@ -630,7 +634,7 @@ export function PlayerProfilePage() {
             </div>
           )}
 
-          {fullSessionSegs.length >= 2 ? (
+          {show('trend') && (fullSessionSegs.length >= 2 ? (
             <div className="panel p-4">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">{trendMetric.label} nel tempo</p>
@@ -701,8 +705,9 @@ export function PlayerProfilePage() {
               title="Trend non ancora disponibile"
               description="Servono almeno 2 sessioni per questo giocatore per mostrare l'andamento nel tempo."
             />
-          )}
+          ))}
 
+          {show('history') && (
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">Storico sessioni</p>
@@ -794,6 +799,7 @@ export function PlayerProfilePage() {
               </p>
             )}
           </div>
+          )}
         </>
       )}
     </div>

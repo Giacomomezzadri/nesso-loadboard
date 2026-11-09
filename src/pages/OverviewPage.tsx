@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { WeekStatusGrid } from '../components/attendance/WeekStatusGrid'
 import { PlanningCalendar } from '../components/calendar/PlanningCalendar'
+import { useReportSection } from '../components/report/ReportSection'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
@@ -45,6 +46,7 @@ export function OverviewPage() {
   const { data: players = [] } = usePlayersQuery()
   const { data: allSegments = [] } = useAllSegmentsQuery()
   const { canEdit } = useAuth()
+  const { inReport, show } = useReportSection()
   const [microMetricKey, setMicroMetricKey] = useState(SELECTABLE_MICROCYCLE_METRICS[0].key)
 
   if (isLoading) return null
@@ -120,6 +122,8 @@ export function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {show('summary') && (
+        <>
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="font-display text-xl font-medium text-ink">{currentSession?.label}</h2>
         <span className="rounded-full bg-ink/8 px-2.5 py-0.5 text-xs font-medium text-ink-secondary">
@@ -141,13 +145,18 @@ export function OverviewPage() {
         <StatTile label="HSR media" value={formatNumber(avgHsr)} unit="m" />
         <StatTile label="Vmax sessione" value={formatNumber(maxSpeed, 1)} unit="km/h" accent />
       </div>
+        </>
+      )}
 
+      {show('alerts') && (
       <div className="panel p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="font-display text-base font-medium text-ink">Alert di questa sessione</p>
-          <Link to="/alerts" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
-            Vedi tutti <ArrowRight className="size-3.5" />
-          </Link>
+          {!inReport && (
+            <Link to="/alerts" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
+              Vedi tutti <ArrowRight className="size-3.5" />
+            </Link>
+          )}
         </div>
         {flags.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-ink-secondary">
@@ -156,7 +165,7 @@ export function OverviewPage() {
           </div>
         ) : (
           <ul className="flex flex-col gap-2">
-            {flags.slice(0, 5).map((flag, i) => (
+            {(inReport ? flags : flags.slice(0, 5)).map((flag, i) => (
               <li key={i} className="flex items-center gap-2 text-sm">
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_STYLE[flag.severity]}`}>
                   {playerById.get(flag.playerId)?.displayName ?? flag.playerId}
@@ -164,16 +173,17 @@ export function OverviewPage() {
                 <span className="truncate text-ink-secondary">{flag.message}</span>
               </li>
             ))}
-            {flags.length > 5 && <li className="text-xs text-ink-muted">+ altri {flags.length - 5}</li>}
+            {!inReport && flags.length > 5 && <li className="text-xs text-ink-muted">+ altri {flags.length - 5}</li>}
           </ul>
         )}
       </div>
+      )}
 
-      <PlanningCalendar sessions={sessions} canEdit={canEdit} />
+      {show('calendar') && <PlanningCalendar sessions={sessions} canEdit={canEdit && !inReport} />}
 
-      <WeekStatusGrid sessions={sessions} segments={allSegments} players={players} />
+      {show('week') && <WeekStatusGrid sessions={sessions} segments={allSegments} players={players} />}
 
-      {microcycleByPlayer.length > 0 && (
+      {show('microcycle') && microcycleByPlayer.length > 0 && (
         <div className="panel p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="font-display text-base font-medium text-ink">Completamento microciclo — squadra</p>
@@ -189,9 +199,11 @@ export function OverviewPage() {
                   </option>
                 ))}
               </select>
-              <Link to="/players" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
-                Vedi per giocatore <ArrowRight className="size-3.5" />
-              </Link>
+              {!inReport && (
+                <Link to="/players" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
+                  Vedi per giocatore <ArrowRight className="size-3.5" />
+                </Link>
+              )}
             </div>
           </div>
           <p className="mb-3 text-sm text-ink-secondary">
