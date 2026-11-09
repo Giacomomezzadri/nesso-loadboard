@@ -329,5 +329,26 @@ export interface AppSettings {
     highVolumeRelative: number
     highSRpeRelative: number
   }
+  /** Shown in the header of every PDF report. */
+  teamName?: string
+  /** Report templates built in Settings by editors/admins — see lib/reports/catalog.ts. */
+  reportTemplates?: ReportTemplate[]
+}
+
+/** Every kind of block a report can contain; add a kind here and in lib/reports/catalog.ts. */
+export type ReportBlockKind = 'week_attendance'
+
+/** One block in a report template, with its own options (unused ones are simply ignored by a kind). */
+export interface ReportBlock {
+  id: string
+  kind: ReportBlockKind
+  /** Rows: only these roles; empty/absent = every active player. */
+  positions?: Position[]
+}
+
+export interface ReportTemplate {
+  id: string
+  name: string
+  blocks: ReportBlock[]
 }
 

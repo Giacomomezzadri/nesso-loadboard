@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { ReportTemplatesEditor } from '../components/report/ReportTemplatesEditor'
 import { putSettings } from '../lib/db/repo'
 import { useAuth } from '../state/AuthContext'
 import { queryKeys, useSettingsQuery } from '../state/queries'
@@ -240,6 +241,12 @@ export function SettingsPage() {
           </label>
         </div>
       </section>
+
+      <ReportTemplatesEditor
+        teamName={draft.teamName ?? ''}
+        templates={draft.reportTemplates ?? []}
+        onChange={update}
+      />
 
       <div className="flex items-center gap-3">
         <button

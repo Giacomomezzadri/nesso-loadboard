@@ -10,6 +10,7 @@ import { GameVGamePage } from './pages/GameVGamePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
 import { OverviewPage } from './pages/OverviewPage'
 import { PlayerProfilePage } from './pages/PlayerProfilePage'
+import { ReportPage } from './pages/ReportPage'
 import { RosterPage } from './pages/RosterPage'
 import { SessionsPage } from './pages/SessionsPage'
 import { SessionVGamePage } from './pages/SessionVGamePage'
@@ -40,6 +41,7 @@ export function App() {
         <Route path="/quality" element={<DataQualityPage />} />
         <Route path="/roster" element={<RosterPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
+        <Route path="/report" element={<ReportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       {/* An Admin is a superuser: every data page above, plus the account

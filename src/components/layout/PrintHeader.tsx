@@ -9,6 +9,7 @@ export function PrintHeader() {
   const { pathname } = useLocation()
   const { currentSession } = useCurrentSession()
   const match = NAV_ITEMS.find((item) => (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)))
+  if (pathname.startsWith('/report')) return null
 
   return (
     <div className="print-page-title mb-4 border-b border-border pb-2">

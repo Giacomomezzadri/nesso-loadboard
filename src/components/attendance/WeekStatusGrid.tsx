@@ -73,10 +73,13 @@ export function WeekStatusGrid({
   sessions,
   segments,
   players,
+  positions,
 }: {
   sessions: Session[]
   segments: DrillSegment[]
   players: Player[]
+  /** Only these roles' rows (reports); empty/absent = every active player. */
+  positions?: Position[]
 }) {
   const today = localTodayIso()
   const lookaheadEnd = addDaysIso(today, 14)
@@ -104,7 +107,7 @@ export function WeekStatusGrid({
   const weekSessions = days.flatMap((d) => sessionsByDay.get(d) ?? [])
 
   const rows = players
-    .filter((p) => p.active)
+    .filter((p) => p.active && (!positions || positions.length === 0 || positions.includes(p.position)))
     .sort(
       (a, b) =>
         POSITION_ORDER.indexOf(a.position) - POSITION_ORDER.indexOf(b.position) || a.displayName.localeCompare(b.displayName),
@@ -132,7 +135,7 @@ export function WeekStatusGrid({
   }
 
   return (
-    <section className="panel flex flex-col gap-3 p-4">
+    <section className="panel flex flex-col gap-3 p-4 print:break-inside-avoid">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-display flex items-center gap-2 text-base font-medium text-ink">
           <ClipboardList className="size-4 text-primary" />
@@ -144,7 +147,7 @@ export function WeekStatusGrid({
             disabled={index === 0}
             onClick={() => setWeekIndex(index - 1)}
             aria-label="Settimana precedente"
-            className="rounded-md p-1 text-ink-secondary hover:bg-ink/5 disabled:opacity-30"
+            className="no-print rounded-md p-1 text-ink-secondary hover:bg-ink/5 disabled:opacity-30"
           >
             <ChevronLeft className="size-4" />
           </button>
@@ -154,7 +157,7 @@ export function WeekStatusGrid({
             disabled={index === weeks.length - 1}
             onClick={() => setWeekIndex(index + 1)}
             aria-label="Settimana successiva"
-            className="rounded-md p-1 text-ink-secondary hover:bg-ink/5 disabled:opacity-30"
+            className="no-print rounded-md p-1 text-ink-secondary hover:bg-ink/5 disabled:opacity-30"
           >
             <ChevronRight className="size-4" />
           </button>

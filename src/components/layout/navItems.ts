@@ -15,6 +15,7 @@ import {
   Users,
   Users2,
   CalendarRange,
+  FileText,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -41,6 +42,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/quality', label: 'Data Quality', icon: ScanSearch },
   { path: '/roster', label: 'Roster & Positions', icon: Users },
   { path: '/sessions', label: 'Import / Sessions', icon: Upload },
+  { path: '/report', label: 'Report', icon: FileText },
   { path: '/settings', label: 'Settings', icon: Settings },
   { path: '/admin', label: 'Account', icon: ShieldCheck, adminOnly: true },
 ]

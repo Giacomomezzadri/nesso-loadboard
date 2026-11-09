@@ -155,7 +155,41 @@ body {
   text-shadow: var(--glow-accent-text, none);
 }
 
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 @media print {
+  :root {
+    --color-page: #faf8f3;
+    --color-surface: #ffffff;
+    --color-surface-raised: #fbfcff;
+    --color-ink: #12172b;
+    --color-ink-secondary: #4b5468;
+    --color-ink-muted: #8991a3;
+    --color-grid: rgba(29, 78, 216, 0.08);
+    --color-baseline: rgba(29, 78, 216, 0.18);
+    --color-border: rgba(29, 78, 216, 0.14);
+    --color-primary: #1d4ed8;
+    --color-primary-ink: #ffffff;
+    --color-accent: #fbbf24;
+    --color-accent-ink: #12172b;
+    --color-series-blue: #2a78d6;
+    --color-series-orange: #eb6834;
+    --color-series-aqua: #1baf7a;
+    --color-series-yellow: #eda100;
+    --color-series-magenta: #e87ba4;
+    --color-series-violet: #4a3aa7;
+    --color-series-red: #e34948;
+    --glow-accent: none;
+    --glow-accent-text: none;
+    --glow-blue: none;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .no-print {
     display: none !important;
   }
