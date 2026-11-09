@@ -6,11 +6,27 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { rollingAverageByDateWindow } from '../lib/metrics/timeSeries'
-import { mean } from '../lib/utils'
-import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import {
+  ACWR_MIN_HISTORY_DAYS,
+  ACWR_MIN_RATED_SHARE,
+  TRAINING_LOAD_LABEL,
+  TRAINING_LOAD_UNIT,
+  computeAcwr,
+  indexRpe,
+  trainingLoadOf,
+  type AcwrZone,
+} from '../lib/metrics/trainingLoad'
+import { cn, formatNumber, mean } from '../lib/utils'
+import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import type { Player, Position } from '../types/domain'
 
 const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
+const ACWR_STYLE: Record<AcwrZone, { label: string; className: string }> = {
+  low: { label: 'Sottocarico', className: 'bg-series-blue/15 text-series-blue' },
+  optimal: { label: 'Ottimale', className: 'bg-status-good/15 text-status-good' },
+  high: { label: 'Alto', className: 'bg-status-warning/25 text-ink' },
+  very_high: { label: 'Picco', className: 'bg-status-critical/15 text-status-critical' },
+}
 const POSITION_LABEL: Record<Position, string> = {
   GK: 'Portieri',
   DEF: 'Difensori',
@@ -22,7 +38,7 @@ const POSITION_LABEL: Record<Position, string> = {
 interface MicrocycleRow {
   player: Player
   sessionsSinceLastMatch: number
-  metrics: { key: string; label: string; pct: number | null; lowSample: boolean }[]
+  metrics: MicrocycleBarChartGroup['players'][number]['metrics']
 }
 
 export function DynamicLoadPage() {
@@ -30,6 +46,7 @@ export function DynamicLoadPage() {
   const { data: rawSegments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { data: rpeEntries = [] } = useAllRpeQuery()
   const { inReport, show } = useReportSection()
 
   if (loadingSessions || loadingSegments || !settings) return null
@@ -65,12 +82,41 @@ export function DynamicLoadPage() {
       type: session.type,
     }))
 
+  // Training Load: only sessions where at least one active, non-Rehab player has an RPE — a
+  // session nobody rated isn't a zero-load day.
+  const rpeIndex = indexRpe(rpeEntries)
+  const trainingLoadPoints = fullSessionByDate.flatMap(({ session, segs }) => {
+    const values = segs.map((s) => trainingLoadOf(rpeIndex, s)).filter((v): v is number => v !== undefined)
+    return values.length > 0 ? [{ date: session.date, label: session.date.slice(5), value: mean(values), type: session.type }] : []
+  })
+
   const panels = [
     { key: 'td', title: 'Distanza totale', unit: 'm', points: buildPoints((s) => s.totalDistanceM) },
     { key: 'hsr', title: 'Distanza > 19.8 km/h', unit: 'm', points: buildPoints(distanceAbove19_8) },
     { key: 'sprint', title: 'Distanza > 25.2 km/h', unit: 'm', points: buildPoints(distanceAbove25_2) },
     { key: 'mechw', title: 'Mechanical Work', unit: '#', points: buildPoints((s) => mechanicalWork(s, settings)) },
-  ].filter((panel) => show(panel.key))
+    { key: 'tl', title: `${TRAINING_LOAD_LABEL} (RPE × minuti)`, unit: TRAINING_LOAD_UNIT, points: trainingLoadPoints },
+  ].filter((panel) => show(panel.key) && (panel.key !== 'tl' || panel.points.length > 0))
+
+  // ACWR as of today (rest days since the last session count), from EWMAs of the daily Training Load.
+  const now = new Date()
+  const acwrRefDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10)
+  const acwrRows = sorted.length > 0
+    ? computeAcwr(
+        rpeEntries,
+        sessions,
+        segments,
+        players.filter((p) => p.active).map((p) => p.id),
+        acwrRefDate,
+      )
+        .filter((r) => r.acute > 0 || r.chronic > 0)
+        .map((r) => ({ ...r, player: players.find((p) => p.id === r.playerId)! }))
+        .sort(
+          (a, b) =>
+            POSITION_ORDER.indexOf(a.player.position) - POSITION_ORDER.indexOf(b.player.position) ||
+            a.player.displayName.localeCompare(b.player.displayName),
+        )
+    : []
 
   const singleSession = sessions.length === 1
 
@@ -92,7 +138,15 @@ export function DynamicLoadPage() {
     const metrics = trackedMicrocycleMetrics.map((def, i) => {
       const result = computeMicrocycleCompletion(player.id, sessions, playerSegments, (s) => def.metric(s, settings))
       if (i === 0) sessionsSinceLastMatch = result.sessionsSinceLastMatch
-      return { key: def.key, label: shortMetricLabel[def.key] ?? def.label, pct: result.pct, lowSample: result.lowSample }
+      return {
+        key: def.key,
+        label: shortMetricLabel[def.key] ?? def.label,
+        pct: result.pct,
+        numerator: result.numerator,
+        denominator: result.denominator,
+        unit: def.unit,
+        lowSample: result.lowSample,
+      }
     })
     return { player, sessionsSinceLastMatch, metrics }
   })
@@ -142,6 +196,71 @@ export function DynamicLoadPage() {
           )
         })}
       </div>
+
+      {show('acwr') && acwrRows.length > 0 && (
+        <div className="panel overflow-x-auto p-4">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold text-ink">{TRAINING_LOAD_LABEL} — carico acuto / cronico (ACWR)</p>
+            <p className="max-w-xl text-xs text-ink-muted">
+              Al {acwrRefDate}. Medie esponenziali (EWMA) del Training Load giornaliero: acuto su 7 giorni, cronico su 28.
+              I giorni di riposo contano 0; le sedute senza RPE vengono saltate. Ottimale tra 0,8 e 1,3.
+            </p>
+          </div>
+          <table className="w-full whitespace-nowrap text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                <th className="py-2 pr-4">Giocatore</th>
+                <th className="px-3 py-2 text-right">Acuto ({TRAINING_LOAD_UNIT}/giorno)</th>
+                <th className="px-3 py-2 text-right">Cronico ({TRAINING_LOAD_UNIT}/giorno)</th>
+                <th className="px-3 py-2 text-right">ACWR</th>
+                <th className="px-3 py-2 text-right" title="Sedute con dati GPS negli ultimi 28 giorni che hanno l'RPE">
+                  RPE inseriti
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {acwrRows.map((r) => (
+                <tr key={r.playerId} className="border-b border-border last:border-0">
+                  <td className="py-1.5 pr-4 font-medium text-ink">{r.player.displayName}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-ink">{formatNumber(r.acute)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-ink">{formatNumber(r.chronic)}</td>
+                  <td className="px-3 py-1.5 text-right">
+                    {r.building ? (
+                      <span className="text-xs text-ink-muted" title={`Servono almeno ${ACWR_MIN_HISTORY_DAYS} giorni di storico`}>
+                        in costruzione
+                      </span>
+                    ) : r.ratio === null || r.zone === null ? (
+                      <span className="text-ink-muted">—</span>
+                    ) : (
+                      <span
+                        className={cn('rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', ACWR_STYLE[r.zone].className)}
+                        title={ACWR_STYLE[r.zone].label}
+                      >
+                        {formatNumber(r.ratio, 2)}
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    className={cn(
+                      'px-3 py-1.5 text-right tabular-nums',
+                      r.sessionsWithData > 0 && r.ratedSessions / r.sessionsWithData < ACWR_MIN_RATED_SHARE
+                        ? 'font-semibold text-status-serious'
+                        : 'text-ink-secondary',
+                    )}
+                    title={
+                      r.sessionsWithData > 0 && r.ratedSessions / r.sessionsWithData < ACWR_MIN_RATED_SHARE
+                        ? 'Troppi RPE mancanti: ACWR poco affidabile'
+                        : undefined
+                    }
+                  >
+                    {r.ratedSessions}/{r.sessionsWithData}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {show('microcycle') && microcycleRows.length > 0 && (
         <div className="flex flex-col gap-3">

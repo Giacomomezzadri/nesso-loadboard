@@ -1,9 +1,14 @@
+import { formatFraction } from '../../lib/utils'
 import type { Player } from '../../types/domain'
 
 export interface MicrocycleMetricRow {
   key: string
   label: string
   pct: number | null
+  /** The player's load so far and the textbook microcycle's — the two figures behind `pct`. */
+  numerator: number
+  denominator: number | null
+  unit: string
   lowSample: boolean
 }
 
@@ -96,6 +101,9 @@ function MicrocycleBarRow({ row }: { row: MicrocycleMetricRow }) {
       <span className="w-12 shrink-0 text-right font-semibold tabular-nums text-ink">
         {row.pct !== null ? `${row.pct.toFixed(0)}%` : '—'}
         {row.lowSample && <span className="text-status-warning">*</span>}
+      </span>
+      <span className="w-28 shrink-0 text-right tabular-nums text-ink-muted">
+        {row.denominator !== null ? formatFraction(row.numerator, row.denominator, row.unit) : '—'}
       </span>
     </div>
   )

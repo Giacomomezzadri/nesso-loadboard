@@ -4,7 +4,7 @@ import { useReportSection } from '../components/report/ReportSection'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
-import { cn, formatNumber, mean } from '../lib/utils'
+import { cn, formatFraction, formatNumber, mean } from '../lib/utils'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import {
   MATCH_LOCATION_LABEL,
@@ -112,7 +112,7 @@ export function GameVGamePage() {
     .sort((x, y) => (y.a ?? -1) - (x.a ?? -1) || (y.b ?? -1) - (x.b ?? -1) || x.name.localeCompare(y.name))
   const minutesCell = (min: number | undefined, available: number) => (
     <td className={cn('px-3 py-1.5 text-right tabular-nums', min === undefined || min < available / 2 ? 'text-ink-muted' : 'text-ink')}>
-      {min === undefined ? '—' : `${formatNumber(min)}′`}
+      {min === undefined ? '—' : available > 0 ? formatFraction(min, available, '′') : `${formatNumber(min)}′`}
       {min !== undefined && available > 0 && (
         <span className="ml-1 text-xs text-ink-muted">{formatNumber((min / available) * 100)}%</span>
       )}

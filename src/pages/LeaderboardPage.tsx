@@ -6,8 +6,9 @@ import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import { JUMP_TESTS, latestTestByPlayer } from '../lib/metrics/jumpTests'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
+import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, useJumpTestsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllRpeQuery, useAllSegmentsQuery, useJumpTestsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { matchDayLabels, type DrillSegment, type Player, type SessionType } from '../types/domain'
 
 type TypeFilter = SessionType | 'all'
@@ -22,7 +23,8 @@ interface MetricSpec {
   key: string
   label: string
   unit: string
-  getValue: (s: DrillSegment) => number
+  /** undefined = no value for that row (Training Load without an RPE) — skipped, never counted as 0. */
+  getValue: (s: DrillSegment) => number | undefined
   aggregate: 'sum' | 'max'
   /** Computed on the period's matches only, whatever the type filter says. */
   matchOnly?: boolean
@@ -52,7 +54,9 @@ function aggregateByPlayer(segs: DrillSegment[], spec: Pick<MetricSpec, 'getValu
   const byPlayer = new Map<string, number[]>()
   for (const seg of segs) {
     const list = byPlayer.get(seg.playerId) ?? []
-    list.push(spec.getValue(seg))
+    const value = spec.getValue(seg)
+    if (value === undefined) continue
+    list.push(value)
     byPlayer.set(seg.playerId, list)
   }
   const result = new Map<string, number>()
@@ -69,6 +73,7 @@ export function LeaderboardPage() {
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
   const { data: jumpTests = [] } = useJumpTestsQuery()
+  const { data: rpeEntries = [] } = useAllRpeQuery()
   const [metricKey, setMetricKey] = useState('td')
   // Empty means "not touched by the user yet" — falls back to the current session's own date below,
   // so the default view still shows a single day (that session) rather than the whole history.
@@ -85,6 +90,7 @@ export function LeaderboardPage() {
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
   const activePlayers = players.filter((p) => p.active)
 
+  const rpeIndex = indexRpe(rpeEntries)
   const metrics: MetricSpec[] = [
     { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM, aggregate: 'sum' },
     { key: 'd198', label: 'Distanza > 19.8 km/h', unit: 'm', getValue: distanceAbove19_8, aggregate: 'sum' },
@@ -93,6 +99,7 @@ export function LeaderboardPage() {
     { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s) => mechanicalWork(s, settings), aggregate: 'sum' },
     { key: 'vmax', label: 'Velocità massima', unit: 'km/h', getValue: (s) => s.maxSpeedKmh, aggregate: 'max' },
     { key: 'matchmin', label: 'Minuti giocati in partita', unit: 'min', getValue: (s) => s.durationSec / 60, aggregate: 'sum', matchOnly: true },
+    { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, getValue: (s) => trainingLoadOf(rpeIndex, s), aggregate: 'sum' },
   ]
   // Figures from Roster & Positions — same for every player regardless of the period/type filter
   // below (always the latest value entered), unlike every GPS-derived metric above. Sprint times
@@ -186,7 +193,9 @@ export function LeaderboardPage() {
     const byPlayer = new Map<string, number[]>()
     for (const seg of segsFor(metric)) {
       const list = byPlayer.get(seg.playerId) ?? []
-      list.push(metric.getValue(seg))
+      const value = metric.getValue(seg)
+      if (value === undefined) continue
+      list.push(value)
       byPlayer.set(seg.playerId, list)
     }
     rows = [...byPlayer.entries()]

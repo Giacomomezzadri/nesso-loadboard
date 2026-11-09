@@ -9,7 +9,7 @@ import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
-import { formatNumber } from '../lib/utils'
+import { formatFraction, formatNumber } from '../lib/utils'
 import { useAuth } from '../state/AuthContext'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import {
@@ -219,6 +219,11 @@ export function OverviewPage() {
               <div key={player.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
                 <span className="truncate text-ink-secondary">{player.displayName}</span>
                 <span className="shrink-0 tabular-nums text-ink">
+                  {result.denominator !== null && (
+                    <span className="mr-1.5 text-xs text-ink-muted">
+                      {formatFraction(result.numerator, result.denominator, microMetricDef.unit)}
+                    </span>
+                  )}
                   {result.pct?.toFixed(0)}%{result.lowSample && <span className="text-status-warning">*</span>}
                 </span>
               </div>

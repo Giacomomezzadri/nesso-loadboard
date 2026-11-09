@@ -12,9 +12,10 @@ import {
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { matchAvailableSeconds } from '../lib/metrics/attendance'
+import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { median } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { matchDayLabels, type DrillSegment, type SessionType } from '../types/domain'
 
 const PLAYER_COLORS = ['var(--color-series-blue)', 'var(--color-series-orange)', 'var(--color-series-aqua)']
@@ -68,6 +69,7 @@ export function ComparePage() {
   const { data: segments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { data: rpeEntries = [] } = useAllRpeQuery()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // Empty means "not touched by the user yet" — falls back to the current session's own date,
   // so the default view still shows a single day rather than the whole history.
@@ -137,6 +139,7 @@ export function ComparePage() {
 
   const selectedPlayerIds = selectedIds.filter((id) => segsByPlayer.has(id))
 
+  const rpeIndex = indexRpe(rpeEntries)
   const sections: { key: string; title: string; metrics: MetricSpec[] }[] = [
     {
       key: 'volume',
@@ -145,13 +148,17 @@ export function ComparePage() {
         { key: 'td', label: 'Distanza totale', unit: 'm', aggregate: sumBy((s) => s.totalDistanceM) },
         { key: 'tdmin', label: 'Distanza / min', unit: 'm/min', aggregate: ratePerMin((s) => s.totalDistanceM), format: (v) => v.toFixed(1) },
         { key: 'dur', label: 'Durata', unit: 'min', aggregate: sumBy((s) => s.durationSec / 60) },
+        { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, aggregate: sumBy((s) => trainingLoadOf(rpeIndex, s) ?? 0) },
         {
           key: 'matchmin',
           label: 'Minuti in partita',
           unit: 'min',
           aggregate: sumBy((s) => s.durationSec / 60),
           matchOnly: true,
-          format: (v) => (availableMatchMin > 0 ? `${v.toFixed(0)} · ${((v / availableMatchMin) * 100).toFixed(0)}%` : v.toFixed(0)),
+          format: (v) =>
+            availableMatchMin > 0
+              ? `${v.toFixed(0)}/${availableMatchMin.toFixed(0)} · ${((v / availableMatchMin) * 100).toFixed(0)}%`
+              : v.toFixed(0),
         },
       ],
     },
@@ -278,7 +285,7 @@ export function ComparePage() {
                                 style={{ left: `${Math.min(100, (teamMedian / maxScale) * 100)}%` }}
                               />
                             </div>
-                            <span className="w-32 shrink-0 text-right tabular-nums text-ink">
+                            <span className="w-40 shrink-0 text-right tabular-nums text-ink">
                               {format(value)} <span className="text-ink-muted">({rank}°)</span>
                             </span>
                           </div>

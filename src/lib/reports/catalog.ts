@@ -26,6 +26,8 @@ export const REPORT_BLOCKS: Record<ReportBlockKind, ReportBlockDef> = {
   'dynamic.hsr': { group: 'Dynamic Load', label: 'Distanza > 19.8 km/h nel tempo', description: 'Media squadra per sessione con media mobile.', options: {} },
   'dynamic.sprint': { group: 'Dynamic Load', label: 'Distanza > 25.2 km/h nel tempo', description: 'Media squadra per sessione con media mobile.', options: {} },
   'dynamic.mechw': { group: 'Dynamic Load', label: 'Mechanical Work nel tempo', description: 'Media squadra per sessione con media mobile.', options: {} },
+  'dynamic.tl': { group: 'Dynamic Load', label: 'Training Load nel tempo', description: 'Media squadra di RPE × minuti per sessione, con media mobile.', options: {} },
+  'dynamic.acwr': { group: 'Dynamic Load', label: 'Training Load — ACWR', description: 'Carico acuto (7 giorni) su cronico (media settimanale di 28 giorni) per giocatore.', options: {} },
   'dynamic.microcycle': { group: 'Dynamic Load', label: 'Microciclo per giocatore', description: 'Ogni metrica di carico come % del microciclo tipo, per ruolo.', options: {} },
 
   'svg.training-vs-game': { group: 'Session v Game', label: 'Allenamento vs Gara', description: "L'allenamento scelto contro il modello gara, squadra e giocatori.", options: {} },

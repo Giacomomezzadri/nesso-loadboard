@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { putPlayer } from '../lib/db/repo'
 import { matchAvailableSeconds, matchSecondsByPlayer } from '../lib/metrics/attendance'
 import { evaluatePlayerPb } from '../lib/metrics/pb'
-import { formatNumber } from '../lib/utils'
+import { formatFraction, formatNumber } from '../lib/utils'
 import type { Player, Position } from '../types/domain'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useAuth } from '../state/AuthContext'
@@ -240,7 +240,9 @@ export function RosterPage() {
                   />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-ink">
-                  {formatNumber((matchSeconds.get(player.id) ?? 0) / 60)}′
+                  {availableMatchSec > 0
+                    ? formatFraction((matchSeconds.get(player.id) ?? 0) / 60, availableMatchSec / 60, '′')
+                    : `${formatNumber((matchSeconds.get(player.id) ?? 0) / 60)}′`}
                   {availableMatchSec > 0 && (
                     <span className="ml-1 text-xs text-ink-muted">
                       {formatNumber(((matchSeconds.get(player.id) ?? 0) / availableMatchSec) * 100)}%

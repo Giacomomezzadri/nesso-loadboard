@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../../lib/metrics/metricsCatalog'
 import { buildMatchWeeks, indexFullSessions, playerWeekLoad, teamWeekMedian } from '../../lib/metrics/similarWeeks'
+import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, trainingLoadOf } from '../../lib/metrics/trainingLoad'
 import { cn, formatNumber } from '../../lib/utils'
+import { useAllRpeQuery } from '../../state/queries'
 import type { AppSettings, DrillSegment, Player, Session } from '../../types/domain'
 
 const PLAYER_COLOR = 'var(--color-series-blue)'
@@ -89,12 +91,16 @@ export function SimilarWeeksPanel({
   const [playerId, setPlayerId] = useState('')
   const [length, setLength] = useState<number | null>(null)
   const [metricKey, setMetricKey] = useState('td')
+  const { data: rpeEntries = [] } = useAllRpeQuery()
+  const rpeIndex = useMemo(() => indexRpe(rpeEntries), [rpeEntries])
 
   const metrics: WeekMetric[] = [
     { key: 'td', label: 'Distanza tot.', unit: 'm', getValue: (s) => s.totalDistanceM },
     { key: 'hsr', label: 'D>19.8', unit: 'm', getValue: distanceAbove19_8 },
     { key: 'sprint', label: 'D>25.2', unit: 'm', getValue: distanceAbove25_2 },
     { key: 'mechw', label: 'MechW', unit: '#', getValue: (s) => mechanicalWork(s, settings) },
+    // A session without an RPE adds nothing to the week's Training Load.
+    { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, getValue: (s) => trainingLoadOf(rpeIndex, s) ?? 0 },
   ]
   const metric = metrics.find((m) => m.key === metricKey) ?? metrics[0]
 

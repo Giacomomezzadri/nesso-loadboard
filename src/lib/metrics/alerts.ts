@@ -102,7 +102,7 @@ export function computeSessionAlerts(
           playerId: entry.playerId,
           type: 'high-srpe',
           severity: 'warning',
-          message: `sRPE ${entry.sRpe.toFixed(0)} — ${Math.round(((entry.sRpe - sRpeMedian) / sRpeMedian) * 100)}% sopra la mediana squadra (${sRpeMedian.toFixed(0)}).`,
+          message: `Training Load ${entry.sRpe.toFixed(0)} — ${Math.round(((entry.sRpe - sRpeMedian) / sRpeMedian) * 100)}% sopra la mediana squadra (${sRpeMedian.toFixed(0)}).`,
         })
       }
     }

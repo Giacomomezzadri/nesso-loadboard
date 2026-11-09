@@ -17,14 +17,16 @@ import {
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { computePlayerAttendance, matchMinutesRank, matchSecondsByPlayer } from '../lib/metrics/attendance'
+import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, rpeOf, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { median } from '../lib/metrics/heatmap'
-import { formatNumber, formatPercent, isoWeek, mean } from '../lib/utils'
+import { formatFraction, formatNumber, formatPercent, isoWeek, mean } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { deletePlayerLink, proposePlayerLink, respondToPlayerLink } from '../lib/db/repo'
 import { useAuth } from '../state/AuthContext'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import {
+  useAllRpeQuery,
   useAllSegmentsQuery,
   useInvalidatePlayerLinks,
   useJumpTestsQuery,
@@ -59,7 +61,8 @@ interface TrendMetricSpec {
   key: string
   label: string
   unit: string
-  getValue: (s: DrillSegment) => number
+  /** undefined = no value for that session (e.g. no RPE entered) — the session is left out, never charted as 0. */
+  getValue: (s: DrillSegment) => number | undefined
 }
 
 /** Training rows show date + training type (the generic import label isn't useful on its own); matches keep their opponent-based label. */
@@ -244,6 +247,7 @@ export function PlayerProfilePage() {
   const { data: currentSessionRpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
   const { data: jumpTests = [] } = useJumpTestsQuery()
+  const { data: rpeEntries = [] } = useAllRpeQuery()
   const { canEdit } = useAuth()
   const { inReport, show } = useReportSection()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
@@ -294,6 +298,7 @@ export function PlayerProfilePage() {
     .filter((row): row is { segment: (typeof mergedSegments)[number]; session: NonNullable<(typeof row)['session']> } => !!row.session)
     .sort((a, b) => a.session.date.localeCompare(b.session.date))
 
+  const rpeIndex = indexRpe(rpeEntries)
   const trendMetrics: TrendMetricSpec[] = [
     { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM },
     { key: 'hsr', label: 'Distanza > 19.8 km/h', unit: 'm', getValue: distanceAbove19_8 },
@@ -305,6 +310,8 @@ export function PlayerProfilePage() {
           { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s: DrillSegment) => mechanicalWork(s, settings) },
         ]
       : []),
+    { key: 'rpe', label: 'RPE', unit: '', getValue: (s) => rpeOf(rpeIndex, s) },
+    { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, getValue: (s) => trainingLoadOf(rpeIndex, s) },
   ]
   const trendMetric = trendMetrics.find((m) => m.key === trendMetricKey) ?? trendMetrics[0]
 
@@ -324,10 +331,11 @@ export function PlayerProfilePage() {
     d.setUTCDate(d.getUTCDate() - 6)
     return d.toISOString().slice(0, 10)
   })()
-  const chartRows =
+  const chartRows = (
     periodMode === 'last7' && last7StartDate
       ? fullSessionSegs.filter((r) => r.session.date >= last7StartDate)
       : fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
+  ).filter((r) => trendMetric.getValue(r.segment) !== undefined)
 
   // Team median per charted session/metric, sourced from the un-merged, workspace-scoped
   // allSegments (same rule as the alert pools above) — a cross-workspace linked session has
@@ -337,15 +345,17 @@ export function PlayerProfilePage() {
   for (const seg of allSegments) {
     if (seg.segmentKind !== 'full_session' || seg.isRehab || !activePlayerIdSet.has(seg.playerId)) continue
     if (!chartSessionIds.has(seg.sessionId)) continue
+    const value = trendMetric.getValue(seg)
+    if (value === undefined) continue
     const list = teamValuesBySession.get(seg.sessionId) ?? []
-    list.push(trendMetric.getValue(seg))
+    list.push(value)
     teamValuesBySession.set(seg.sessionId, list)
   }
   const chartData = chartRows.map((r) => {
     const teamValues = teamValuesBySession.get(r.session.id)
     return {
       x: r.session.date,
-      value: trendMetric.getValue(r.segment),
+      value: trendMetric.getValue(r.segment) ?? 0,
       median: teamValues && teamValues.length > 0 ? median(teamValues) : null,
     }
   })
@@ -595,6 +605,11 @@ export function PlayerProfilePage() {
                   <div key={def.key} className="flex items-center justify-between gap-2 py-1.5 text-sm">
                     <span className="text-ink-secondary">{def.label}</span>
                     <span className="shrink-0 tabular-nums text-ink" title={DENOMINATOR_CAPTION[result.denominatorSource]}>
+                      {result.denominator !== null && (
+                        <span className="mr-1.5 text-xs text-ink-muted">
+                          {formatFraction(result.numerator, result.denominator, def.unit)}
+                        </span>
+                      )}
                       {result.pct !== null ? `${result.pct.toFixed(0)}%` : '—'}
                       {result.lowSample && <span className="text-status-warning">*</span>}
                     </span>
@@ -747,6 +762,8 @@ export function PlayerProfilePage() {
                     <th className="px-3 py-2 text-right">TD (m)</th>
                     <th className="px-3 py-2 text-right">HSR (m)</th>
                     <th className="px-3 py-2 text-right">Vmax (km/h)</th>
+                    <th className="px-3 py-2 text-right">RPE</th>
+                    <th className="px-3 py-2 text-right">{TRAINING_LOAD_LABEL}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -784,6 +801,13 @@ export function PlayerProfilePage() {
                       <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>{r.segment.hsrM.toFixed(0)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>
                         {r.segment.maxSpeedKmh.toFixed(1)}
+                      </td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>{rpeOf(rpeIndex, r.segment) ?? '—'}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>
+                        {(() => {
+                          const tl = trainingLoadOf(rpeIndex, r.segment)
+                          return tl === undefined ? '—' : formatNumber(tl)
+                        })()}
                       </td>
                     </tr>
                     )

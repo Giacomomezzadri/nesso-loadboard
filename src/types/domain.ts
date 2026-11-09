@@ -349,6 +349,8 @@ export type ReportBlockKind =
   | 'dynamic.hsr'
   | 'dynamic.sprint'
   | 'dynamic.mechw'
+  | 'dynamic.tl'
+  | 'dynamic.acwr'
   | 'dynamic.microcycle'
   | 'svg.training-vs-game'
   | 'svg.intensity'

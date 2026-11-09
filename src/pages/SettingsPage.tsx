@@ -227,7 +227,7 @@ export function SettingsPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-secondary">
-            sRPE alto (% sopra mediana)
+            Training Load alto (% sopra mediana)
             <input
               type="number"
               value={Math.round(draft.alertThresholds.highSRpeRelative * 100)}

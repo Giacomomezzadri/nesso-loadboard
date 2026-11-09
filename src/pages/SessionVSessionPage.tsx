@@ -5,8 +5,9 @@ import { useReportSection } from '../components/report/ReportSection'
 import { EmptyState } from '../components/ui/EmptyState'
 import { median } from '../lib/metrics/heatmap'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
+import { TRAINING_LOAD_LABEL, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment, type Position } from '../types/domain'
 
 // Counted as "sessions of this type" INCLUDING the one currently open — a
@@ -19,7 +20,8 @@ const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
 interface MetricSpec {
   key: string
   label: string
-  getValue: (s: DrillSegment) => number
+  /** undefined = no value (Training Load without an RPE): shown as "—" and left out of the median. */
+  getValue: (s: DrillSegment) => number | undefined
 }
 
 export function SessionVSessionPage() {
@@ -28,6 +30,7 @@ export function SessionVSessionPage() {
   const { data: rawSegments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { data: rpeEntries = [] } = useAllRpeQuery()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
   const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
@@ -38,11 +41,13 @@ export function SessionVSessionPage() {
 
   if (!currentSession || isLoading || !settings) return null
 
+  const rpeIndex = indexRpe(rpeEntries)
   const metrics: MetricSpec[] = [
     { key: 'td', label: 'Distanza tot. (m)', getValue: (s) => s.totalDistanceM },
     { key: 'hsr', label: 'D>19.8 (m)', getValue: distanceAbove19_8 },
     { key: 'sprint', label: 'D>25.2 (m)', getValue: distanceAbove25_2 },
     { key: 'mechw', label: 'MechW (#)', getValue: (s) => mechanicalWork(s, settings) },
+    { key: 'tl', label: `${TRAINING_LOAD_LABEL} (UA)`, getValue: (s) => trainingLoadOf(rpeIndex, s) },
   ]
 
   const strictByTrainingType = currentSession.type === 'training' && !!currentSession.trainingType && !includeAllTrainingTypes
@@ -171,6 +176,13 @@ export function SessionVSessionPage() {
                       </td>
                       {metrics.map((m) => {
                         const current = m.getValue(row.seg)
+                        if (current === undefined) {
+                          return (
+                            <td key={m.key} className="px-3 py-2 text-right text-ink-muted" title="RPE non inserito">
+                              —
+                            </td>
+                          )
+                        }
                         if (row.rehab) {
                           return (
                             <td key={m.key} className="px-3 py-2 text-right tabular-nums text-status-critical">
@@ -179,9 +191,10 @@ export function SessionVSessionPage() {
                             </td>
                           )
                         }
-                        const totalSessions = row.history.length + 1 // history + the one currently open
-                        const enoughHistory = row.history.length >= MIN_COMPARABLE_HISTORY
-                        const historyMedian = enoughHistory ? median(row.history.map(m.getValue)) : null
+                        const historyValues = row.history.map(m.getValue).filter((v): v is number => v !== undefined)
+                        const totalSessions = historyValues.length + 1 // history + the one currently open
+                        const enoughHistory = historyValues.length >= MIN_COMPARABLE_HISTORY
+                        const historyMedian = enoughHistory ? median(historyValues) : null
                         return (
                           <td key={m.key} className="px-3 py-2 text-right tabular-nums text-ink">
                             {current.toFixed(0)}

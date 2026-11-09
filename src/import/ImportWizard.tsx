@@ -314,7 +314,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
 
           <div className="panel p-5">
             <p className="mb-3 text-sm text-ink-secondary">
-              RPE opzionale (scala 1-10) per calcolare lo sRPE — puoi saltare e inserirlo più tardi.
+              RPE opzionale (scala 1-10) per calcolare il Training Load (RPE × minuti) — puoi saltare e inserirlo più tardi.
             </p>
             <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
               {players.map((p) => (

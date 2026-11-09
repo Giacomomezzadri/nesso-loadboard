@@ -36,6 +36,14 @@ export function formatPercent(value: number, fractionDigits = 0): string {
   return `${formatNumber(value, fractionDigits)}%`
 }
 
+/** The two figures behind a percentage, e.g. "1.234/2.000 m" — shown next to every % so it can be checked. */
+export function formatFraction(numerator: number, denominator: number, unit = '', fractionDigits = 0): string {
+  const num = formatNumber(numerator, fractionDigits)
+  const den = formatNumber(denominator, fractionDigits)
+  if (unit === '′') return `${num}′/${den}′`
+  return unit ? `${num}/${den} ${unit}` : `${num}/${den}`
+}
+
 export function mean(values: number[]): number {
   if (values.length === 0) return 0
   return values.reduce((sum, v) => sum + v, 0) / values.length
