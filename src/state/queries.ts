@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import {
   listAllRpe,
   listAllSegments,
+  listBodyMeasurements,
   listLinkedPlayerData,
   listPlayerLinks,
   listPlayers,
@@ -31,6 +32,7 @@ export const queryKeys = {
   jumpTests: ['jump-tests'] as const,
   playerAliases: ['player-aliases'] as const,
   playerStatuses: ['player-statuses'] as const,
+  bodyMeasurements: ['body-measurements'] as const,
 }
 
 export function useSessionsQuery() {
@@ -107,6 +109,15 @@ export function useInvalidateJumpTests() {
     queryClient.invalidateQueries({ queryKey: queryKeys.jumpTests })
     queryClient.invalidateQueries({ queryKey: queryKeys.playerAliases })
   }
+}
+
+export function useBodyMeasurementsQuery() {
+  return useQuery({ queryKey: queryKeys.bodyMeasurements, queryFn: listBodyMeasurements })
+}
+
+export function useInvalidateBodyMeasurements() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.bodyMeasurements })
 }
 
 export function usePlayerStatusesQuery() {

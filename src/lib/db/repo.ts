@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  BodyMeasurement,
   DrillSegment,
   JumpTest,
   PlannedDay,
@@ -163,6 +164,20 @@ export async function putPlayerStatuses(
   statuses: { playerId: string; status: PlayerSessionStatus }[],
 ): Promise<void> {
   await apiFetch('/api/player-statuses/bulk', { method: 'POST', body: JSON.stringify({ sessionId, statuses }) })
+}
+
+// ---------- body composition ----------
+
+export async function listBodyMeasurements(): Promise<BodyMeasurement[]> {
+  return apiFetch<BodyMeasurement[]>('/api/body-measurements')
+}
+
+export async function putBodyMeasurement(m: Omit<BodyMeasurement, 'updatedAt'>): Promise<BodyMeasurement> {
+  return apiFetch<BodyMeasurement>('/api/body-measurements', { method: 'PUT', body: JSON.stringify(m) })
+}
+
+export async function deleteBodyMeasurement(playerId: string, date: string): Promise<void> {
+  await apiFetch(`/api/body-measurements?playerId=${encodeURIComponent(playerId)}&date=${date}`, { method: 'DELETE' })
 }
 
 // ---------- auth ----------

@@ -109,6 +109,19 @@ export interface JumpTest {
   importedAt: string
 }
 
+/** One body-composition measurement, entered by hand; one per player per date (re-entering a date replaces it). */
+export interface BodyMeasurement {
+  playerId: string
+  date: string // ISO "YYYY-MM-DD"
+  /** Body fat, % of body weight. */
+  fatMassPct?: number
+  /** Sum of skinfolds, mm. */
+  skinfoldMm?: number
+  /** Muscle mass, kg. */
+  muscleMassKg?: number
+  updatedAt: string
+}
+
 /** A hand-made pairing of an externally spelled name (normalized) to a roster player. */
 export interface PlayerAlias {
   aliasKey: string
@@ -367,6 +380,7 @@ export type ReportBlockKind =
   | 'compare.mechanical'
   | 'profile.tiles'
   | 'profile.jump_tests'
+  | 'profile.body'
   | 'profile.alerts'
   | 'profile.microcycle'
   | 'profile.weekly_model'

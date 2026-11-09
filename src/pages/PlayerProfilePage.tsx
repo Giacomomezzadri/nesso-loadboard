@@ -8,6 +8,7 @@ import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { useReportSection } from '../components/report/ReportSection'
+import { BodyCompositionPanel } from '../components/body/BodyCompositionPanel'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import {
   distanceAbove19_8,
@@ -559,6 +560,8 @@ export function PlayerProfilePage() {
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
           )}
+
+          {show('body') && activePlayerId && <BodyCompositionPanel playerId={activePlayerId} canEdit={canEdit && !inReport} />}
 
           {show('jump_tests') && activePlayerId && <JumpTestsPanel playerId={activePlayerId} tests={jumpTests} activePlayerIds={activePlayerIdSet} />}
 
