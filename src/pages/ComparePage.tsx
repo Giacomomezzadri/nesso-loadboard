@@ -5,14 +5,18 @@ import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import {
   accHighCount,
+  accModerateCount,
   decHighCount,
+  decModerateCount,
+  distanceAbove14_4,
   distanceAbove19_8,
   distanceAbove25_2,
   mechanicalWork,
+  pctOfPersonalBest,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { matchAvailableSeconds } from '../lib/metrics/attendance'
-import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
+import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, rpeOf, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { median } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
@@ -48,6 +52,14 @@ const maxBy =
   (getValue: (s: DrillSegment) => number) =>
   (segs: DrillSegment[]): number =>
     Math.max(...segs.map(getValue))
+
+/** Mean over the rows that have a value — 0 when none do (rendered as "—" by the metric's format). */
+const meanBy =
+  (getValue: (s: DrillSegment) => number | undefined) =>
+  (segs: DrillSegment[]): number => {
+    const values = segs.map(getValue).filter((v): v is number => v !== undefined)
+    return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
+  }
 
 // Rates (m/min, mechanical work/min) are recomputed from the summed totals rather than summed
 // themselves — summing a per-minute rate across days would inflate it, not aggregate it.
@@ -145,10 +157,11 @@ export function ComparePage() {
       key: 'volume',
       title: 'Volume',
       metrics: [
+        { key: 'sessions', label: 'Sessioni', unit: '', aggregate: (segs) => new Set(segs.map((s) => s.sessionId)).size },
         { key: 'td', label: 'Distanza totale', unit: 'm', aggregate: sumBy((s) => s.totalDistanceM) },
         { key: 'tdmin', label: 'Distanza / min', unit: 'm/min', aggregate: ratePerMin((s) => s.totalDistanceM), format: (v) => v.toFixed(1) },
+        { key: 'tdsession', label: 'Distanza media per sessione', unit: 'm', aggregate: meanBy((s) => s.totalDistanceM) },
         { key: 'dur', label: 'Durata', unit: 'min', aggregate: sumBy((s) => s.durationSec / 60) },
-        { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, aggregate: sumBy((s) => trainingLoadOf(rpeIndex, s) ?? 0) },
         {
           key: 'matchmin',
           label: 'Minuti in partita',
@@ -166,10 +179,19 @@ export function ComparePage() {
       key: 'high_speed',
       title: 'Alta velocità',
       metrics: [
+        { key: 'd144', label: 'Distanza > 14.4 km/h', unit: 'm', aggregate: sumBy(distanceAbove14_4) },
         { key: 'hsr', label: 'HSR (>19.8 km/h)', unit: 'm', aggregate: sumBy(distanceAbove19_8) },
+        { key: 'hsrmin', label: 'HSR / min', unit: 'm/min', aggregate: ratePerMin(distanceAbove19_8), format: (v) => v.toFixed(1) },
         { key: 'sprintd', label: 'Sprint (>25.2 km/h)', unit: 'm', aggregate: sumBy(distanceAbove25_2) },
         { key: 'nsprint', label: '# Sprint', unit: '', aggregate: sumBy((s) => sprintCount(s, settings)) },
         { key: 'vmax', label: 'Velocità massima', unit: 'km/h', aggregate: maxBy((s) => s.maxSpeedKmh), format: (v) => v.toFixed(1) },
+        {
+          key: 'pctvmax',
+          label: '% della Vmax personale',
+          unit: '%',
+          aggregate: maxBy((s) => pctOfPersonalBest(s, playerById.get(s.playerId)?.personalMaxSpeedKmh) ?? 0),
+          format: (v) => (v > 0 ? v.toFixed(0) : '—'),
+        },
       ],
     },
     {
@@ -178,8 +200,51 @@ export function ComparePage() {
       metrics: [
         { key: 'mechw', label: 'Mechanical Work', unit: '#', aggregate: sumBy((s) => mechanicalWork(s, settings)) },
         { key: 'mechwmin', label: 'MechW / min', unit: '#/min', aggregate: ratePerMin((s) => mechanicalWork(s, settings)), format: (v) => v.toFixed(2) },
+        { key: 'accmod', label: 'Acc. moderate', unit: '#', aggregate: sumBy((s) => accModerateCount(s, settings)) },
         { key: 'acchigh', label: 'Acc. alta', unit: '#', aggregate: sumBy((s) => accHighCount(s, settings)) },
+        { key: 'decmod', label: 'Dec. moderate', unit: '#', aggregate: sumBy((s) => decModerateCount(s, settings)) },
         { key: 'dechigh', label: 'Dec. alta', unit: '#', aggregate: sumBy((s) => decHighCount(s, settings)) },
+        {
+          key: 'accmin',
+          label: 'Accelerazioni / min',
+          unit: '#/min',
+          aggregate: ratePerMin((s) => accModerateCount(s, settings) + accHighCount(s, settings)),
+          format: (v) => v.toFixed(2),
+        },
+        {
+          key: 'decmin',
+          label: 'Decelerazioni / min',
+          unit: '#/min',
+          aggregate: ratePerMin((s) => decModerateCount(s, settings) + decHighCount(s, settings)),
+          format: (v) => v.toFixed(2),
+        },
+      ],
+    },
+    {
+      key: 'internal',
+      title: 'Carico interno',
+      metrics: [
+        { key: 'tl', label: TRAINING_LOAD_LABEL, unit: TRAINING_LOAD_UNIT, aggregate: sumBy((s) => trainingLoadOf(rpeIndex, s) ?? 0) },
+        {
+          key: 'tlmean',
+          label: `${TRAINING_LOAD_LABEL} medio per sessione`,
+          unit: TRAINING_LOAD_UNIT,
+          aggregate: meanBy((s) => trainingLoadOf(rpeIndex, s)),
+          format: (v) => (v > 0 ? v.toFixed(0) : '—'),
+        },
+        {
+          key: 'rpe',
+          label: 'RPE medio',
+          unit: '',
+          aggregate: meanBy((s) => rpeOf(rpeIndex, s)),
+          format: (v) => (v > 0 ? v.toFixed(1) : '—'),
+        },
+        {
+          key: 'rpecount',
+          label: 'Sessioni con RPE',
+          unit: '',
+          aggregate: (segs) => segs.filter((s) => rpeOf(rpeIndex, s) !== undefined).length,
+        },
       ],
     },
   ]

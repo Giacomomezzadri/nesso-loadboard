@@ -48,6 +48,8 @@ export const REPORT_BLOCKS: Record<ReportBlockKind, ReportBlockDef> = {
   'compare.high_speed': { group: 'Compare', label: 'Confronto giocatori — Alta velocità', description: 'Fino a 3 giocatori contro la mediana squadra.', options: {} },
   'compare.mechanical': { group: 'Compare', label: 'Confronto giocatori — Meccanico', description: 'Fino a 3 giocatori contro la mediana squadra.', options: {} },
 
+  'compare.internal': { group: 'Compare', label: 'Confronto giocatori — Carico interno', description: 'Training Load e RPE di fino a 3 giocatori contro la mediana squadra.', options: {} },
+
   'profile.tiles': { group: 'Player Profile', label: 'Riquadri giocatore', description: 'Sessioni e presenze, minuti in partita, distanza settimanale, Vmax.', options: {} },
   'profile.jump_tests': { group: 'Player Profile', label: 'Test di salto', description: 'Ultimo CMJ e Drop Jump con asimmetrie.', options: {} },
   'profile.body': { group: 'Player Profile', label: 'Composizione corporea', description: 'Massa grassa, plicometria e massa muscolare con la variazione dall\'ultima misurazione.', options: {} },

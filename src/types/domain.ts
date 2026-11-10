@@ -378,6 +378,7 @@ export type ReportBlockKind =
   | 'compare.volume'
   | 'compare.high_speed'
   | 'compare.mechanical'
+  | 'compare.internal'
   | 'profile.tiles'
   | 'profile.jump_tests'
   | 'profile.body'
