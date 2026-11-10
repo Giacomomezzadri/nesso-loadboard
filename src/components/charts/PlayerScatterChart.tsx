@@ -6,7 +6,11 @@ export interface ScatterPoint {
   initials: string
   x: number
   y: number
+  /** 'player' = red, 'role' = orange; when anything is highlighted the rest turn grey. */
+  highlight?: 'player' | 'role'
 }
+
+const HIGHLIGHT_FILL = { player: 'var(--color-status-critical)', role: 'var(--color-series-orange)' } as const
 
 interface PlayerScatterChartProps {
   points: ScatterPoint[]
@@ -41,12 +45,14 @@ function tightDomain(values: number[]): [number, number] {
  * mark — identity is legible at a glance without a legend or hover, matching
  * the "label inside a colored fill" exception (pick ink by the fill's
  * luminance). A 2px surface ring keeps overlapping dots distinct. */
-function PlayerDot(props: { cx?: number; cy?: number; payload?: ScatterPoint }) {
-  const { cx, cy, payload } = props
+function PlayerDot(props: { cx?: number; cy?: number; payload?: ScatterPoint; dimmed?: boolean }) {
+  const { cx, cy, payload, dimmed } = props
   if (cx === undefined || cy === undefined || !payload) return null
+  const fill = payload.highlight ? HIGHLIGHT_FILL[payload.highlight] : dimmed ? 'var(--color-ink-muted)' : 'var(--color-accent)'
+  const ink = payload.highlight ? '#ffffff' : dimmed ? 'var(--color-surface)' : 'var(--color-accent-ink)'
   return (
-    <g>
-      <circle cx={cx} cy={cy} r={DOT_RADIUS} fill="var(--color-accent)" stroke="var(--color-surface)" strokeWidth={2} />
+    <g opacity={!payload.highlight && dimmed ? 0.45 : 1}>
+      <circle cx={cx} cy={cy} r={DOT_RADIUS} fill={fill} stroke="var(--color-surface)" strokeWidth={2} />
       <text
         x={cx}
         y={cy}
@@ -54,7 +60,7 @@ function PlayerDot(props: { cx?: number; cy?: number; payload?: ScatterPoint }) 
         dominantBaseline="central"
         fontSize={9}
         fontWeight={700}
-        fill="var(--color-accent-ink)"
+        fill={ink}
       >
         {payload.initials}
       </text>
@@ -99,6 +105,10 @@ function ScatterTooltip({
 export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: PlayerScatterChartProps) {
   const xDomain = tightDomain(points.map((p) => p.x))
   const yDomain = tightDomain(points.map((p) => p.y))
+  const anyHighlight = points.some((p) => p.highlight)
+  // SVG paints in order: highlighted dots last so they sit on top (red above orange).
+  const rank = (p: ScatterPoint) => (p.highlight === 'player' ? 2 : p.highlight === 'role' ? 1 : 0)
+  const ordered = [...points].sort((a, b) => rank(a) - rank(b))
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -133,7 +143,7 @@ export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: Pla
           cursor={{ strokeDasharray: '3 3', stroke: 'var(--color-baseline)' }}
           content={<ScatterTooltip xLabel={xLabel} yLabel={yLabel} />}
         />
-        <Scatter data={points} shape={PlayerDot} />
+        <Scatter data={ordered} shape={(props: object) => <PlayerDot {...props} dimmed={anyHighlight} />} />
       </ScatterChart>
     </ResponsiveContainer>
   )

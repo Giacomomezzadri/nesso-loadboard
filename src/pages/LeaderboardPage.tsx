@@ -9,9 +9,16 @@ import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } fro
 import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllRpeQuery, useAllSegmentsQuery, useJumpTestsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import { matchDayLabels, type DrillSegment, type Player, type SessionType } from '../types/domain'
+import { matchDayLabels, type DrillSegment, type Player, type Position, type SessionType } from '../types/domain'
 
 type TypeFilter = SessionType | 'all'
+
+const SCATTER_POSITIONS: { value: Position; label: string }[] = [
+  { value: 'GK', label: 'Portieri' },
+  { value: 'DEF', label: 'Difensori' },
+  { value: 'MID', label: 'Centrocampisti' },
+  { value: 'FWD', label: 'Attaccanti' },
+]
 
 const TYPE_FILTER_LABEL: Record<TypeFilter, string> = {
   all: 'ALL',
@@ -82,6 +89,8 @@ export function LeaderboardPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [xVarKey, setXVarKey] = useState('td')
   const [yVarKey, setYVarKey] = useState('vmax')
+  const [highlightPlayerId, setHighlightPlayerId] = useState('')
+  const [highlightPosition, setHighlightPosition] = useState<Position | ''>('')
   const { inReport, show } = useReportSection()
 
   if (!currentSession || isLoading || !settings) return null
@@ -268,8 +277,12 @@ export function LeaderboardPage() {
     const x = xVar.values.get(p.id)
     const y = yVar.values.get(p.id)
     if (x === undefined || y === undefined) return []
-    return [{ playerId: p.id, name: p.displayName, initials: p.displayName.replace(/\s+/g, '').slice(0, 4).toUpperCase(), x, y }]
+    const highlight = p.id === highlightPlayerId ? 'player' : highlightPosition && p.position === highlightPosition ? 'role' : undefined
+    return [
+      { playerId: p.id, name: p.displayName, initials: p.displayName.replace(/\s+/g, '').slice(0, 4).toUpperCase(), x, y, highlight },
+    ] as ScatterPoint[]
   })
+  const highlightedPlayer = activePlayers.find((p) => p.id === highlightPlayerId)
 
   return (
     <div className="flex flex-col gap-4">
@@ -397,6 +410,50 @@ export function LeaderboardPage() {
               </select>
             </label>
           </div>
+        </div>
+        <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            <span className="size-2.5 rounded-full bg-status-critical" />
+            <span className="text-ink-secondary">Evidenzia giocatore</span>
+            <select
+              value={highlightPlayerId}
+              onChange={(e) => setHighlightPlayerId(e.target.value)}
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+            >
+              <option value="">Nessuno</option>
+              {[...activePlayers]
+                .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.displayName}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="size-2.5 rounded-full bg-series-orange" />
+            <span className="text-ink-secondary">Evidenzia ruolo</span>
+            <select
+              value={highlightPosition}
+              onChange={(e) => setHighlightPosition(e.target.value as Position | '')}
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+            >
+              <option value="">Nessuno</option>
+              {SCATTER_POSITIONS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {(highlightedPlayer || highlightPosition) && (
+            <span className="text-xs text-ink-muted">
+              {highlightedPlayer && scatterPoints.every((p) => p.playerId !== highlightedPlayer.id)
+                ? `${highlightedPlayer.displayName} non ha dati per queste due variabili · `
+                : ''}
+              Gli altri giocatori sono in grigio.
+            </span>
+          )}
         </div>
         {scatterPoints.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-muted">
