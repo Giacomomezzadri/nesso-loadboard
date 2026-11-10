@@ -1,6 +1,6 @@
 import { Trophy } from 'lucide-react'
 import { useState } from 'react'
-import { PlayerScatterChart, type ScatterPoint } from '../components/charts/PlayerScatterChart'
+import { HIGHLIGHT_FILL, PlayerScatterChart, type ScatterPoint } from '../components/charts/PlayerScatterChart'
 import { useReportSection } from '../components/report/ReportSection'
 import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -413,7 +413,7 @@ export function LeaderboardPage() {
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2">
-            <span className="size-2.5 rounded-full bg-status-critical" />
+            <span className="size-2.5 rounded-full" style={{ backgroundColor: HIGHLIGHT_FILL.player }} />
             <span className="text-ink-secondary">Evidenzia giocatore</span>
             <select
               value={highlightPlayerId}
@@ -431,7 +431,7 @@ export function LeaderboardPage() {
             </select>
           </label>
           <label className="flex items-center gap-2">
-            <span className="size-2.5 rounded-full bg-series-orange" />
+            <span className="size-2.5 rounded-full" style={{ backgroundColor: HIGHLIGHT_FILL.role }} />
             <span className="text-ink-secondary">Evidenzia ruolo</span>
             <select
               value={highlightPosition}

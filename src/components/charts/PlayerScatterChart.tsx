@@ -6,11 +6,13 @@ export interface ScatterPoint {
   initials: string
   x: number
   y: number
-  /** 'player' = red, 'role' = orange; when anything is highlighted the rest turn grey. */
+  /** 'player' = dark blue, 'role' = light blue; when anything is highlighted the rest turn grey. */
   highlight?: 'player' | 'role'
 }
 
-const HIGHLIGHT_FILL = { player: 'var(--color-status-critical)', role: 'var(--color-series-orange)' } as const
+/** Two clearly different blues: a dark navy for the one player, a light sky blue for the role. */
+export const HIGHLIGHT_FILL = { player: '#1e3a8a', role: '#7dd3fc' } as const
+const HIGHLIGHT_INK = { player: '#ffffff', role: '#12172b' } as const
 
 interface PlayerScatterChartProps {
   points: ScatterPoint[]
@@ -49,7 +51,7 @@ function PlayerDot(props: { cx?: number; cy?: number; payload?: ScatterPoint; di
   const { cx, cy, payload, dimmed } = props
   if (cx === undefined || cy === undefined || !payload) return null
   const fill = payload.highlight ? HIGHLIGHT_FILL[payload.highlight] : dimmed ? 'var(--color-ink-muted)' : 'var(--color-accent)'
-  const ink = payload.highlight ? '#ffffff' : dimmed ? 'var(--color-surface)' : 'var(--color-accent-ink)'
+  const ink = payload.highlight ? HIGHLIGHT_INK[payload.highlight] : dimmed ? 'var(--color-surface)' : 'var(--color-accent-ink)'
   return (
     <g opacity={!payload.highlight && dimmed ? 0.45 : 1}>
       <circle cx={cx} cy={cy} r={DOT_RADIUS} fill={fill} stroke="var(--color-surface)" strokeWidth={2} />
@@ -106,7 +108,7 @@ export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: Pla
   const xDomain = tightDomain(points.map((p) => p.x))
   const yDomain = tightDomain(points.map((p) => p.y))
   const anyHighlight = points.some((p) => p.highlight)
-  // SVG paints in order: highlighted dots last so they sit on top (red above orange).
+  // SVG paints in order: highlighted dots last so they sit on top (the player above the role).
   const rank = (p: ScatterPoint) => (p.highlight === 'player' ? 2 : p.highlight === 'role' ? 1 : 0)
   const ordered = [...points].sort((a, b) => rank(a) - rank(b))
 
