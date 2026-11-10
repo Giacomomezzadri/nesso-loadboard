@@ -25,7 +25,7 @@ export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
   mix: 'Mix',
   // A friendly match, imported like a real match (same full-session/game data) but filed as a
   // training session — it must NOT close a microcycle the way a real match does (see
-  // lastMatchDate/historicalMicrocycleGroups in microcycle.ts, both keyed on type === 'match').
+  // lastMatchDate/currentMicrocycleSessions in microcycle.ts, both keyed on type === 'match').
   amichevole: 'Amichevole',
 }
 

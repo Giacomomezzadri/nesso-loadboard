@@ -21,7 +21,7 @@ import { computePlayerAttendance, matchMinutesRank, matchSecondsByPlayer } from 
 import { TRAINING_LOAD_LABEL, TRAINING_LOAD_UNIT, indexRpe, rpeOf, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { median } from '../lib/metrics/heatmap'
-import { formatFraction, formatNumber, formatPercent, isoWeek, mean } from '../lib/utils'
+import { formatFraction, formatNumber, formatPercent, isoWeek } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { deletePlayerLink, proposePlayerLink, respondToPlayerLink } from '../lib/db/repo'
 import { useAuth } from '../state/AuthContext'
@@ -41,8 +41,7 @@ import {
 import { TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
-  'valid-cycles': 'vs media dei microcicli storici completi (Ripresa+Forza+Metabolico+Rifinitura)',
-  'per-type-fallback': 'vs media per tipologia — nessun microciclo storico completo ancora disponibile',
+  'per-type': 'vs somma delle medie per tipologia (Ripresa + Forza + Metabolico + Rifinitura)',
   'insufficient-data': 'dati storici insufficienti per un confronto',
 }
 
@@ -375,15 +374,17 @@ export function PlayerProfilePage() {
   const minutesRank = activePlayerId
     ? matchMinutesRank(activePlayerId, activeRosterPlayers.map((p) => p.id), matchSecondsByPlayer(sessions, allSegments))
     : undefined
-  // Weekly, not per-session: sum this player's distance within each calendar week, then
-  // average those weekly totals — a session-count average would understate weeks with more
-  // sessions and overstate quiet ones.
+  // Weekly, not per-session: sum this player's distance within each calendar week, then take
+  // the median of those weekly totals (robust to one huge or one half-empty week). The current
+  // week is left out — it is still in progress and would read as a low week.
+  const currentWeek = isoWeek(new Date().toISOString().slice(0, 10))
   const weeklyDistanceTotals = new Map<string, number>()
   for (const r of fullSessionSegs) {
     const week = isoWeek(r.session.date)
+    if (week === currentWeek) continue
     weeklyDistanceTotals.set(week, (weeklyDistanceTotals.get(week) ?? 0) + r.segment.totalDistanceM)
   }
-  const avgWeeklyDistance = mean([...weeklyDistanceTotals.values()])
+  const medianWeeklyDistance = weeklyDistanceTotals.size > 0 ? median([...weeklyDistanceTotals.values()]) : undefined
   const maxSpeed = Math.max(0, ...mergedSegments.map((s) => s.maxSpeedKmh))
   const maxSpeedSegment = mergedSegments.find((s) => s.maxSpeedKmh === maxSpeed)
   const maxSpeedDate = maxSpeedSegment ? sessionById.get(maxSpeedSegment.sessionId)?.date : undefined
@@ -549,7 +550,16 @@ export function PlayerProfilePage() {
                 }
               />
             )}
-            <StatTile label="Distanza media settimanale" value={formatNumber(avgWeeklyDistance)} unit="m" />
+            <StatTile
+              label="Distanza settimanale (mediana)"
+              value={medianWeeklyDistance === undefined ? '—' : formatNumber(medianWeeklyDistance)}
+              unit="m"
+              hint={
+                weeklyDistanceTotals.size > 0
+                  ? `Su ${weeklyDistanceTotals.size} settimane concluse, esclusa quella in corso`
+                  : 'Nessuna settimana conclusa'
+              }
+            />
             <StatTile
               label="Vmax storica"
               value={formatNumber(maxSpeed, 1)}
@@ -598,10 +608,8 @@ export function PlayerProfilePage() {
               <p className="mb-3 text-xs text-ink-muted">
                 Carico dalle {microcycleRows[0].result.sessionsSinceLastMatch} sedute svolte dall'ultima partita a
                 oggi
-                {microcycleRows[0].result.validCycleCount > 0 &&
-                  `, su ${microcycleRows[0].result.validCycleCount} microcicli storici validi`}
-                . Ogni riga confronta il valore contro la media dello stesso dato in un microciclo tipo (Ripresa +
-                Forza + Metabolico + Rifinitura).
+                . Ogni riga confronta il valore con il microciclo tipo del giocatore: la somma delle sue medie
+                storiche per Ripresa, Forza, Metabolico e Rifinitura (allenamenti prima dell'ultima partita).
               </p>
               <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
                 {microcycleRows.map(({ def, result }) => (

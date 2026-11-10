@@ -6,14 +6,15 @@ const REQUIRED_TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico
 /** Below this many attended sessions in the current (in-progress) microcycle, the % is unreliable — flagged with an asterisk, not hidden. */
 const LOW_SAMPLE_THRESHOLD = 3
 
-export type DenominatorSource = 'valid-cycles' | 'per-type-fallback' | 'insufficient-data'
+export type DenominatorSource = 'per-type' | 'insufficient-data'
 
 export interface MicrocycleCompletion {
   numerator: number
   denominator: number | null
   pct: number | null
   denominatorSource: DenominatorSource
-  validCycleCount: number
+  /** How many of the 4 training types had historical data for this player (the denominator sums only those). */
+  typesWithData: number
   sessionsSinceLastMatch: number
   lowSample: boolean
 }
@@ -46,35 +47,6 @@ export function currentMicrocycleSessions(sessions: Session[]): Session[] {
   return trainingSessionsInWindow(sessions, lastMatch, null)
 }
 
-/**
- * STEP 2 — partitions history into the training-session groups that sit
- * strictly between two consecutive matches (the in-progress group after the
- * LAST match is excluded here — that's currentMicrocycleSessions, not history).
- */
-export function historicalMicrocycleGroups(sessions: Session[]): Session[][] {
-  const matches = sortByDate(sessions.filter((s) => s.type === 'match'))
-  const groups: Session[][] = []
-  for (let i = 0; i < matches.length - 1; i++) {
-    const group = trainingSessionsInWindow(sessions, matches[i].date, matches[i + 1].date)
-    if (group.length > 0) groups.push(group)
-  }
-  return groups
-}
-
-/**
- * A historical microcycle is "valid" only with EXACTLY 4 training sessions,
- * one each of Ripresa/Forza/Metabolico+alte velocità/Rifinitura — no extra
- * session, no duplicate type, Recupero attivo/Mix not part of the recipe.
- */
-export function isValidMicrocycle(group: Session[]): boolean {
-  if (group.length !== 4) return false
-  const types = group.map((s) => s.trainingType)
-  if (types.some((t) => !t)) return false
-  const uniqueTypes = new Set(types)
-  if (uniqueTypes.size !== 4) return false
-  return REQUIRED_TRAINING_TYPES.every((t) => uniqueTypes.has(t))
-}
-
 /** Sum of a metric across a session group, for one player — sessions the player has no segment for simply don't contribute (their absence isn't fabricated as 0-with-full-weight, it's just not counted, same spirit as the rest of the app's "never fabricate" rule). */
 function sumMetricForPlayer(
   group: Session[],
@@ -94,7 +66,7 @@ function sumMetricForPlayer(
   return { sum, attended }
 }
 
-/** Average per-type load for a player across ALL their training sessions of that type — the fallback denominator basis when no complete 4-session historical microcycle exists yet. */
+/** The player's "textbook" microcycle: their average load per training type (Ripresa, Forza, Metabolico, Rifinitura), summed. */
 function perTypeAverageSum(
   sessions: Session[],
   playerId: string,
@@ -120,8 +92,8 @@ function perTypeAverageSum(
 
 /**
  * Full computation for one player: current in-progress load (since the last
- * match) as a % of what a "typical" 4-session microcycle costs them
- * historically. See the module doc above for the exact STEP 1-3 recipe.
+ * match) as a % of their textbook microcycle — the sum of their average load in
+ * each of the 4 training types, over every training session before the last match.
  */
 export function computeMicrocycleCompletion(
   playerId: string,
@@ -137,28 +109,13 @@ export function computeMicrocycleCompletion(
   const current = currentMicrocycleSessions(allSessions)
   const { sum: numerator, attended } = sumMetricForPlayer(current, playerId, fullSessionByPlayerAndSession, metric)
 
-  const historicalGroups = historicalMicrocycleGroups(allSessions)
-  const validGroups = historicalGroups.filter(isValidMicrocycle)
-  const validSums = validGroups
-    .map((g) => sumMetricForPlayer(g, playerId, fullSessionByPlayerAndSession, metric))
-    .filter((r) => r.attended > 0)
-
-  let denominator: number | null = null
-  let denominatorSource: DenominatorSource = 'insufficient-data'
-
-  if (validSums.length > 0) {
-    denominator = validSums.reduce((a, b) => a + b.sum, 0) / validSums.length
-    denominatorSource = 'valid-cycles'
-  } else {
-    // Scoped to historical sessions only (strictly before the last match) —
-    // must never include the in-progress window we're measuring in STEP 1,
-    // or the comparison becomes circular.
-    const fallback = perTypeAverageSum(historicalGroups.flat(), playerId, fullSessionByPlayerAndSession, metric)
-    if (fallback.typesWithData > 0) {
-      denominator = fallback.sum
-      denominatorSource = 'per-type-fallback'
-    }
-  }
+  // Historical sessions only (strictly before the last match) — never the in-progress
+  // window measured above, or the comparison becomes circular. No match yet → no history.
+  const lastMatch = lastMatchDate(allSessions)
+  const history = lastMatch === null ? [] : trainingSessionsInWindow(allSessions, null, lastMatch)
+  const perType = perTypeAverageSum(history, playerId, fullSessionByPlayerAndSession, metric)
+  const denominator = perType.typesWithData > 0 ? perType.sum : null
+  const denominatorSource: DenominatorSource = denominator !== null ? 'per-type' : 'insufficient-data'
 
   const pct = denominator && denominator > 0 ? (numerator / denominator) * 100 : null
 
@@ -167,7 +124,7 @@ export function computeMicrocycleCompletion(
     denominator,
     pct,
     denominatorSource,
-    validCycleCount: validGroups.length,
+    typesWithData: perType.typesWithData,
     sessionsSinceLastMatch: attended,
     lowSample: attended < LOW_SAMPLE_THRESHOLD,
   }
