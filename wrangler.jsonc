@@ -1,13 +1,28 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "nesso-loadboard",
+  "name": "loziolab",
   "pages_build_output_dir": "dist",
   "compatibility_date": "2026-06-15",
+  // Production (main → loziolab.com). Both databases live in the EU
+  // jurisdiction on Giacomo's Cloudflare account; see DEPLOY.md.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "nesso-loadboard",
-      "database_id": "20555707-dbb3-453c-9a34-b0a1b5a13856"
+      "database_name": "loadboard",
+      "database_id": "3d6d665f-821e-4ba2-a819-2efafccf59fd"
     }
-  ]
+  ],
+  "env": {
+    // Preview deployments (every non-main branch) get their own database,
+    // so a preview can never write into production data.
+    "preview": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "loadboard-preview",
+          "database_id": "94b39344-9a76-4784-b28f-dbdb73d54f16"
+        }
+      ]
+    }
+  }
 }
