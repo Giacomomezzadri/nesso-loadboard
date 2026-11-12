@@ -26,7 +26,7 @@ The app does **not** apply migrations on deploy. After merging a new file in
 ```bash
 npx wrangler d1 migrations list loadboard --remote
 npx wrangler d1 migrations apply loadboard --remote          # production
-npx wrangler d1 migrations apply loadboard-preview --remote  # previews
+npx wrangler d1 migrations apply loadboard-preview --remote --env preview  # previews
 ```
 
 State on 2026-11-12: both databases have `0001`–`0015` recorded in
