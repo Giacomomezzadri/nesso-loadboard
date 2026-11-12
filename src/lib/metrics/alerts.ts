@@ -20,8 +20,10 @@ export interface DatedFullSession {
 const SPEED_EXPOSURE_WINDOW_DAYS = 7
 const SPEED_EXPOSURE_PCT_THRESHOLD = 90
 
-function isoDateMinusDays(dateIso: string, days: number): string {
+/** `dateIso` minus `days`, as "YYYY-MM-DD" — null for a malformed date, which would otherwise make toISOString() throw and take the whole page down. */
+function isoDateMinusDays(dateIso: string, days: number): string | null {
   const d = new Date(dateIso + 'T00:00:00Z')
+  if (Number.isNaN(d.getTime())) return null
   d.setUTCDate(d.getUTCDate() - days)
   return d.toISOString().slice(0, 10)
 }
@@ -108,8 +110,9 @@ export function computeSessionAlerts(
     }
   }
 
-  if (referenceDate) {
-    const windowStart = isoDateMinusDays(referenceDate, SPEED_EXPOSURE_WINDOW_DAYS - 1)
+  const windowStart = referenceDate ? isoDateMinusDays(referenceDate, SPEED_EXPOSURE_WINDOW_DAYS - 1) : null
+  if (referenceDate && windowStart) {
+    // Window is the 7 calendar days ending on referenceDate, both ends inclusive.
     // Only rows with a real (>0) %-of-own-max reading count — a missing/unconfirmed
     // reference must never be read as "0% exposure" and turned into a fabricated flag.
     const peakPctByPlayer = new Map<string, number>()
@@ -121,14 +124,20 @@ export function computeSessionAlerts(
       if (pct > peak) peakPctByPlayer.set(seg.playerId, pct)
     }
 
+    // One flag per player, even if the session holds more than one full_session row for them.
+    const flaggedPlayers = new Set<string>()
     for (const seg of fullSessionSegs) {
+      if (flaggedPlayers.has(seg.playerId)) continue
       const peak = peakPctByPlayer.get(seg.playerId)
+      // Strictly below: a peak of exactly 90% counts as having reached the threshold.
       if (peak !== undefined && peak < SPEED_EXPOSURE_PCT_THRESHOLD) {
+        flaggedPlayers.add(seg.playerId)
         flags.push({
           playerId: seg.playerId,
           type: 'low-speed-exposure',
           severity: 'serious',
-          message: `Negli ultimi ${SPEED_EXPOSURE_WINDOW_DAYS} giorni non ha mai superato il ${SPEED_EXPOSURE_PCT_THRESHOLD}% della propria velocità massima (picco: ${peak.toFixed(0)}%).`,
+          // Rounded down, so a peak of 89.6% never reads as "picco: 90%" next to "never above 90%".
+          message: `Negli ultimi ${SPEED_EXPOSURE_WINDOW_DAYS} giorni non ha mai superato il ${SPEED_EXPOSURE_PCT_THRESHOLD}% della propria velocità massima (picco: ${Math.floor(peak)}%).`,
         })
       }
     }
