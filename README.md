@@ -9,7 +9,7 @@ MVP demo: focus su funzionalità e UI/UX, non su scalabilità/multi-tenant/robus
 - React + TypeScript + Vite + Tailwind CSS
 - `recharts` (grafici), TanStack Query, `react-router-dom`
 - Persistenza dati **client-side** in IndexedDB (via `idb`) — nessun backend, nessun database centrale. I dati vivono nel browser di chi la usa, non sincronizzano tra dispositivi.
-- Deploy: Cloudflare Pages, git-integration su push a `main` (vedi `terraform/cloudflare/pages-nesso-loadboard.tf` in [`nesso-infra`](https://github.com/nesso-labs/nesso-infra))
+- Deploy: Cloudflare Pages (progetto `loziolab`, dominio [loziolab.com](https://loziolab.com)), git-integration su push a `main`; database D1. Vedi [`DEPLOY.md`](DEPLOY.md).
 
 ## Sviluppo locale
 
