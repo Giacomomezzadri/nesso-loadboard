@@ -19,7 +19,7 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
       />
       <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-4 bg-page p-4 shadow-xl">
         <div className="flex items-center justify-between">
-          <span className="font-display text-lg font-semibold tracking-tight text-ink">LoadBoard</span>
+          <span className="font-display text-lg font-semibold tracking-tight text-ink">LozioBoard</span>
           <button
             type="button"
             aria-label="Chiudi menu"

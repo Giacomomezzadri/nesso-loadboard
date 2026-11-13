@@ -1,6 +1,7 @@
 import { loginPage, resolveSession, safeReturnPath, schemaNotReady, type AppData } from './_lib/auth'
 import { forbidden, json } from './_lib/json'
 import type { Env } from './_lib/mappers'
+import { TERMS_PATH } from './_lib/terms'
 
 /**
  * Whole-site auth gate.
@@ -25,7 +26,7 @@ import type { Env } from './_lib/mappers'
  * is a client-side routing concern (see src/App.tsx), since Pages serves the
  * same bundle for every path in a client-routed app.
  */
-const PUBLIC_PATHS = new Set(['/api/auth/login', '/api/auth/logout', '/favicon.svg'])
+const PUBLIC_PATHS = new Set(['/api/auth/login', '/api/auth/logout', '/favicon.svg', TERMS_PATH])
 const SELF_SERVICE_AUTH_PATHS = new Set(['/api/auth/me', '/api/auth/password'])
 
 export const onRequest: PagesFunction<Env, string, AppData> = async ({ request, env, next, data }) => {

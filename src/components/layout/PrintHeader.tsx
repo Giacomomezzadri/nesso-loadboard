@@ -14,7 +14,7 @@ export function PrintHeader() {
   return (
     <div className="print-page-title mb-4 border-b border-border pb-2">
       <p className="font-display text-lg font-medium text-ink">
-        LoadBoard <span className="text-ink-secondary">{match?.label ?? ''}</span>
+        LozioBoard <span className="text-ink-secondary">{match?.label ?? ''}</span>
       </p>
       {currentSession && (
         <p className="text-sm text-ink-secondary">

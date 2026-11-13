@@ -1,4 +1,4 @@
-# LoadBoard
+# LozioBoard
 
 Dashboard di monitoraggio del carico GPS per il preparatore atletico. Sostituisce il report PDF di una piattaforma GPS a pagamento: stesso export CSV in input, dashboard web (con viste aggiuntive) in output.
 

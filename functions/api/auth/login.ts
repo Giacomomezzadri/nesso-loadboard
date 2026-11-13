@@ -1,6 +1,7 @@
 import { createSession, loginPage, safeReturnPath, schemaNotReady } from '../../_lib/auth'
 import type { Env } from '../../_lib/mappers'
 import { verifyPassword } from '../../_lib/passwords'
+import { recordTermsAcceptance } from '../../_lib/terms'
 
 /** Blunt brute-force tax: a slow guess is a dead guess. */
 const FAILED_ATTEMPT_DELAY_MS = 500
@@ -18,6 +19,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const password = String(form.get('password') ?? '')
   const returnPath = safeReturnPath(String(form.get('next') ?? '/'))
   const userAgent = request.headers.get('user-agent')
+
+  // The checkbox is `required` in the form, but the browser is not the gate.
+  if (form.get('terms') !== 'accepted') {
+    return loginPage(returnPath, email, 'Per accedere devi accettare i Termini di utilizzo e l’Informativa privacy.')
+  }
 
   let user: UserRow | null
   try {
@@ -42,6 +48,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     await new Promise((resolve) => setTimeout(resolve, FAILED_ATTEMPT_DELAY_MS))
     return loginPage(returnPath, email, 'Email o password errati.')
   }
+
+  // No session without a stored acceptance: if this write fails, so does the login.
+  await recordTermsAcceptance(env, user!.id, userAgent)
 
   return new Response(null, {
     status: 303,

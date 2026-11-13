@@ -374,7 +374,7 @@ export function AdminPage() {
     <div className="min-h-full bg-page">
       <header className="flex h-14 items-center gap-3 border-b border-border bg-surface px-5">
         <ShieldCheck className="size-5 text-primary" />
-        <h1 className="font-display text-base font-medium text-ink">LoadBoard — Admin</h1>
+        <h1 className="font-display text-base font-medium text-ink">LozioBoard — Admin</h1>
         <div className="ml-auto flex items-center gap-3">
           <Link
             to="/"

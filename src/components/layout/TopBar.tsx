@@ -81,7 +81,7 @@ function ChangePasswordButton() {
 function useCurrentPageLabel(): string {
   const { pathname } = useLocation()
   const match = NAV_ITEMS.find((item) => (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path)))
-  return match?.label ?? 'LoadBoard'
+  return match?.label ?? 'LozioBoard'
 }
 
 export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {

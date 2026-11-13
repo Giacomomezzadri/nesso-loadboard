@@ -1,4 +1,5 @@
 import type { Env } from './mappers'
+import { TERMS_PATH } from './terms'
 
 /**
  * Multi-user auth: email + password accounts with three roles, backed by D1.
@@ -181,7 +182,7 @@ export function loginPage(returnPath: string, prefillEmail = '', error?: string)
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
-<title>LoadBoard — Accesso</title>
+<title>LozioBoard — Accesso</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -235,6 +236,10 @@ export function loginPage(returnPath: string, prefillEmail = '', error?: string)
   }
   input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
   .field { margin-bottom: 14px; }
+  .terms { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 18px; }
+  .terms input { width: 16px; height: 16px; margin: 2px 0 0; padding: 0; flex: none; accent-color: var(--primary); }
+  .terms label { margin: 0; font-weight: 400; line-height: 1.45; }
+  .terms a { color: var(--primary); }
   button {
     width: 100%; margin-top: 4px; padding: 11px 12px; font: inherit;
     font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 6px;
@@ -250,7 +255,7 @@ export function loginPage(returnPath: string, prefillEmail = '', error?: string)
 </head>
 <body>
   <main>
-    <h1>LoadBoard</h1>
+    <h1>LozioBoard</h1>
     <p class="sub">Accesso riservato. Inserisci le tue credenziali per continuare.</p>
     ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
     <form method="POST" action="/api/auth/login">
@@ -263,6 +268,11 @@ export function loginPage(returnPath: string, prefillEmail = '', error?: string)
       <div class="field">
         <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="terms">
+        <input id="terms" name="terms" type="checkbox" value="accepted" required />
+        <label for="terms">Ho letto e accetto i
+          <a href="${TERMS_PATH}" target="_blank" rel="noopener">Termini di utilizzo e l'Informativa privacy</a>.</label>
       </div>
       <button type="submit">Entra</button>
     </form>

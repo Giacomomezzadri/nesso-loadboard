@@ -1,6 +1,6 @@
 # Deploy
 
-LoadBoard runs on Giacomo's Cloudflare account (moved from nesso on 2026-11-12).
+LozioBoard runs on Giacomo's Cloudflare account (moved from nesso on 2026-11-12).
 
 ## Pieces
 

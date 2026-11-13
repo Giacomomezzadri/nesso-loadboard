@@ -12,7 +12,7 @@ function BrandMark() {
         <path d="M12 1.5 22 6v6.2c0 6-4.3 9.6-10 10.3-5.7-.7-10-4.3-10-10.3V6z" fill="var(--color-primary)" />
         <path d="M12 1.5 22 6v6.2c0 6-4.3 9.6-10 10.3z" fill="var(--color-ink)" fillOpacity="0.16" />
       </svg>
-      <span className="font-display text-lg font-semibold tracking-tight text-ink">LoadBoard</span>
+      <span className="font-display text-lg font-semibold tracking-tight text-ink">LozioBoard</span>
     </div>
   )
 }
