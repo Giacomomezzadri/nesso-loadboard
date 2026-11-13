@@ -177,7 +177,10 @@ export function BodyCompositionPanel({ playerId, canEdit }: { playerId: string; 
       )}
 
       {history.length === 0 ? (
-        <p className="text-sm text-ink-muted">Nessuna misurazione registrata per questo giocatore.</p>
+        <p className="text-sm text-ink-muted">
+          Nessuna misurazione registrata per questo giocatore. Si inseriscono qui o si importano da file ISAK dalla pagina Sessioni
+          (Antropometria).
+        </p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">

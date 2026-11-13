@@ -1,12 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
-import { AlertTriangle, Check, FileUp, Link2, X } from 'lucide-react'
+import { AlertTriangle, Check, FileUp, X } from 'lucide-react'
 import { useState } from 'react'
 import { buildNameMatcher, nameKey, type NameMatch } from '../lib/csv/matchPlayerNames'
 import { parseJumpTestCsv, type ParsedJumpFile } from '../lib/csv/parseJumpTestCsv'
 import { putJumpTests } from '../lib/db/repo'
-import { cn } from '../lib/utils'
 import { useInvalidateJumpTests, usePlayerAliasesQuery, usePlayersQuery } from '../state/queries'
-import type { JumpTest, PlayerAlias } from '../types/domain'
+import type { JumpTest } from '../types/domain'
+import { MatchBadge, PlayerSelect, aliasesToRemember, autoPlayerId } from './PlayerMatch'
 
 interface NameRow {
   key: string
@@ -14,13 +14,6 @@ interface NameRow {
   testTypes: string[]
   rowCount: number
   match: NameMatch
-}
-
-const MATCH_BADGE: Record<NameMatch['status'], { label: string; className: string }> = {
-  name: { label: 'Trovato', className: 'bg-status-good/15 text-status-good' },
-  alias: { label: 'Abbinamento salvato', className: 'bg-primary/10 text-primary' },
-  ambiguous: { label: 'Più giocatori', className: 'bg-status-warning/20 text-ink' },
-  none: { label: 'Da abbinare', className: 'bg-status-serious/20 text-ink' },
 }
 
 /**
@@ -55,11 +48,8 @@ export function JumpTestImport({ onClose }: { onClose: () => void }) {
   const nameRows = [...rowsByKey.values()].sort(
     (a, b) => Number(b.match.status === 'none' || b.match.status === 'ambiguous') - Number(a.match.status === 'none' || a.match.status === 'ambiguous') || a.sourceName.localeCompare(b.sourceName),
   )
-  const autoPlayerId = (row: NameRow) => (row.match.status === 'name' || row.match.status === 'alias' ? row.match.playerId : '')
-  const chosenPlayerId = (row: NameRow) => choice[row.key] ?? autoPlayerId(row)
+  const chosenPlayerId = (row: { key: string; match: NameMatch }) => choice[row.key] ?? autoPlayerId(row)
 
-  const activePlayers = players.filter((p) => p.active).sort((a, b) => a.displayName.localeCompare(b.displayName))
-  const inactivePlayers = players.filter((p) => !p.active).sort((a, b) => a.displayName.localeCompare(b.displayName))
   const matchedRows = nameRows.filter((r) => chosenPlayerId(r) !== '')
   const testCount = matchedRows.reduce((n, r) => n + r.rowCount, 0)
   const unresolved = nameRows.length - matchedRows.length
@@ -77,15 +67,7 @@ export function JumpTestImport({ onClose }: { onClose: () => void }) {
           tests.set(id, { id, playerId, importedAt, ...row })
         }
       }
-      // Remember every pairing a plain name match wouldn't find on its own next time.
-      const newAliases: PlayerAlias[] = nameRows.flatMap((r) => {
-        const playerId = chosenPlayerId(r)
-        if (!playerId) return []
-        if (r.match.status === 'name' && r.match.playerId === playerId) return []
-        if (r.match.status === 'alias' && r.match.playerId === playerId) return []
-        return [{ aliasKey: r.key, playerId }]
-      })
-      await putJumpTests([...tests.values()], newAliases)
+      await putJumpTests([...tests.values()], aliasesToRemember(nameRows, chosenPlayerId))
       return tests.size
     },
     onSuccess: (count) => {
@@ -176,49 +158,15 @@ export function JumpTestImport({ onClose }: { onClose: () => void }) {
                   <tbody>
                     {nameRows.map((row) => {
                       const chosen = chosenPlayerId(row)
-                      const manual = row.key in choice && chosen !== autoPlayerId(row)
-                      const badge = manual
-                        ? chosen
-                          ? { label: 'Abbinato a mano', className: 'bg-primary/10 text-primary' }
-                          : { label: 'Non importato', className: 'bg-ink/8 text-ink-muted' }
-                        : MATCH_BADGE[row.match.status]
                       return (
                         <tr key={row.key} className="border-b border-border/60 last:border-0">
                           <td className="px-4 py-2 font-medium text-ink">{row.sourceName}</td>
                           <td className="px-4 py-2 text-ink-secondary">{row.testTypes.join(', ')}</td>
                           <td className="px-4 py-2">
-                            <select
-                              value={chosen}
-                              onChange={(e) => setChoice((c) => ({ ...c, [row.key]: e.target.value }))}
-                              className={cn(
-                                'w-full min-w-44 rounded-md border bg-surface px-2 py-1 text-sm text-ink',
-                                chosen ? 'border-border' : 'border-status-serious/60',
-                              )}
-                            >
-                              <option value="">— Non importare —</option>
-                              <optgroup label="Attivi">
-                                {activePlayers.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.displayName}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              {inactivePlayers.length > 0 && (
-                                <optgroup label="Non attivi">
-                                  {inactivePlayers.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.displayName}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                            </select>
+                            <PlayerSelect players={players} value={chosen} onChange={(id) => setChoice((c) => ({ ...c, [row.key]: id }))} />
                           </td>
                           <td className="px-4 py-2">
-                            <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', badge.className)}>
-                              {(manual || row.match.status === 'alias') && chosen && <Link2 className="size-3" />}
-                              {badge.label}
-                            </span>
+                            <MatchBadge row={row} chosen={chosen} picked={row.key in choice} />
                           </td>
                         </tr>
                       )

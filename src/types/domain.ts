@@ -119,7 +119,28 @@ export interface BodyMeasurement {
   skinfoldMm?: number
   /** Muscle mass, kg. */
   muscleMassKg?: number
+  /** The full anthropometric profile, when the measurement came from an ISAK file import. */
+  anthropometry?: AnthropometryRecord
   updatedAt: string
+}
+
+/**
+ * Raw ISAK profile kept alongside an imported body measurement, so the derived values can be
+ * recomputed (or other measures surfaced) later without re-importing. Keys of the three maps
+ * are the field keys in src/lib/body/anthropometry.ts.
+ */
+export interface AnthropometryRecord {
+  timepoint?: string
+  heightCm?: number
+  weightKg?: number
+  /** Age on the measurement date, in years (decimal). */
+  ageYears?: number
+  girthsCm: Record<string, number>
+  breadthsCm: Record<string, number>
+  skinfoldsMm: Record<string, number>
+  /** Equations used for fatMassPct / muscleMassKg — see src/lib/body/anthropometry.ts. */
+  fatMassMethod?: string
+  muscleMassMethod?: string
 }
 
 /** A hand-made pairing of an externally spelled name (normalized) to a roster player. */

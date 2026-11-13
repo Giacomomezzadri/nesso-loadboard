@@ -1,16 +1,9 @@
 import type { AppData } from '../_lib/auth'
-import { ensureBodyMeasurementTable, rowToBodyMeasurement } from '../_lib/bodyMeasurements'
+import { BODY_VALUE_RANGES as RANGES, ensureBodyMeasurementTable, rowToBodyMeasurement } from '../_lib/bodyMeasurements'
 import { ISO_DATE } from '../_lib/calendar'
 import { badRequest, json, notFound } from '../_lib/json'
 import type { Env } from '../_lib/mappers'
 import type { BodyMeasurement } from '../../src/types/domain'
-
-/** Plausible ranges — anything outside is a typo, not a measurement. */
-const RANGES = {
-  fatMassPct: [1, 60],
-  skinfoldMm: [5, 400],
-  muscleMassKg: [10, 150],
-} as const
 
 /** Every measurement in this workspace (a few per player per season). */
 export const onRequestGet: PagesFunction<Env, string, AppData> = async ({ env, data }) => {
@@ -21,7 +14,11 @@ export const onRequestGet: PagesFunction<Env, string, AppData> = async ({ env, d
   return json((results as Record<string, unknown>[]).map(rowToBodyMeasurement))
 }
 
-/** Saves (or replaces) one player's measurement on one date. Viewers are refused non-GET calls by _middleware.ts. */
+/**
+ * Saves (or replaces) one player's measurement on one date. A hand entry replacing an imported
+ * one drops its stored ISAK profile, which would no longer match the values.
+ * Viewers are refused non-GET calls by _middleware.ts.
+ */
 export const onRequestPut: PagesFunction<Env, string, AppData> = async ({ request, env, data }) => {
   const body = (await request.json()) as Partial<BodyMeasurement>
   if (!body?.playerId || !ISO_DATE.test(body.date ?? '')) return badRequest('giocatore o data non validi')
@@ -49,7 +46,8 @@ export const onRequestPut: PagesFunction<Env, string, AppData> = async ({ reques
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(workspace_id, player_id, date) DO UPDATE SET
        fat_mass_pct = excluded.fat_mass_pct, skinfold_mm = excluded.skinfold_mm,
-       muscle_mass_kg = excluded.muscle_mass_kg, updated_at = excluded.updated_at`,
+       muscle_mass_kg = excluded.muscle_mass_kg, updated_at = excluded.updated_at,
+       data = NULL`,
   )
     .bind(workspaceId, body.playerId, body.date, values.fatMassPct, values.skinfoldMm, values.muscleMassKg, updatedAt)
     .run()

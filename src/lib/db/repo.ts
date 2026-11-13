@@ -176,6 +176,18 @@ export async function putBodyMeasurement(m: Omit<BodyMeasurement, 'updatedAt'>):
   return apiFetch<BodyMeasurement>('/api/body-measurements', { method: 'PUT', body: JSON.stringify(m) })
 }
 
+/**
+ * Saves an anthropometry file import: the measurements, the name pairings made by hand and,
+ * with updatePlayers, the roster height/weight (only where no newer measurement exists).
+ */
+export async function putBodyMeasurements(
+  measurements: Omit<BodyMeasurement, 'updatedAt'>[],
+  aliases: PlayerAlias[],
+  updatePlayers: boolean,
+): Promise<void> {
+  await apiFetch('/api/body-measurements/bulk', { method: 'POST', body: JSON.stringify({ measurements, aliases, updatePlayers }) })
+}
+
 export async function deleteBodyMeasurement(playerId: string, date: string): Promise<void> {
   await apiFetch(`/api/body-measurements?playerId=${encodeURIComponent(playerId)}&date=${date}`, { method: 'DELETE' })
 }

@@ -120,6 +120,16 @@ export function useInvalidateBodyMeasurements() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.bodyMeasurements })
 }
 
+/** After an anthropometry import — the measurements, name pairings and roster height/weight. */
+export function useInvalidateBodyMeasurementImport() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.bodyMeasurements })
+    queryClient.invalidateQueries({ queryKey: queryKeys.playerAliases })
+    queryClient.invalidateQueries({ queryKey: queryKeys.players })
+  }
+}
+
 export function usePlayerStatusesQuery() {
   return useQuery({ queryKey: queryKeys.playerStatuses, queryFn: listPlayerStatuses })
 }

@@ -2,6 +2,7 @@ import { Gauge, Pencil, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImportWizard } from '../import/ImportWizard'
+import { AnthropometryImport } from '../import/AnthropometryImport'
 import { JumpTestImport } from '../import/JumpTestImport'
 import { EmptyState } from '../components/ui/EmptyState'
 import { buildRpeEntries } from '../lib/csv/importSession'
@@ -364,9 +365,11 @@ export function SessionsPage() {
   const { canEdit } = useAuth()
   const [importing, setImporting] = useState(false)
   const [importingJumps, setImportingJumps] = useState(false)
+  const [importingBody, setImportingBody] = useState(false)
   const navigate = useNavigate()
 
   if (importingJumps && canEdit) return <JumpTestImport onClose={() => setImportingJumps(false)} />
+  if (importingBody && canEdit) return <AnthropometryImport onClose={() => setImportingBody(false)} />
 
   if (importing && canEdit) {
     return (
@@ -394,6 +397,13 @@ export function SessionsPage() {
               className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary/50"
             >
               <Upload className="size-4" /> Test di salto
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportingBody(true)}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:border-primary/50"
+            >
+              <Upload className="size-4" /> Antropometria
             </button>
             <button
               type="button"
