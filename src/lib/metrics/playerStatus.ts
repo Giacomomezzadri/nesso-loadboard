@@ -4,6 +4,8 @@ import type { DrillSegment, PlayerSessionStatus, PlayerStatusEntry, Session } fr
  * Resolves each player's situation in a session: a GPS full-session row means Present (or
  * Rehab, in a training, when the row was flagged so); otherwise whatever the editor picked
  * at import. Undefined = not recorded (e.g. sessions imported before this existed).
+ * withOtherTeam: present, but with GPS data added from another squad's export (the
+ * "Altra squadra" status kept next to the data — see functions/api/sessions/add-players.ts).
  */
 export function buildStatusResolver(segments: DrillSegment[], stored: PlayerStatusEntry[]) {
   const gps = new Map<string, DrillSegment>()
@@ -12,10 +14,13 @@ export function buildStatusResolver(segments: DrillSegment[], stored: PlayerStat
   }
   const manual = new Map(stored.map((e) => [`${e.sessionId}:${e.playerId}`, e.status]))
 
-  return (session: Session, playerId: string): { status?: PlayerSessionStatus; segment?: DrillSegment } => {
+  return (session: Session, playerId: string): { status?: PlayerSessionStatus; segment?: DrillSegment; withOtherTeam?: boolean } => {
     const key = `${session.id}:${playerId}`
     const segment = gps.get(key)
-    if (segment) return { status: session.type === 'training' && segment.isRehab ? 'rehab' : 'present', segment }
+    if (segment) {
+      const status = session.type === 'training' && segment.isRehab ? 'rehab' : 'present'
+      return { status, segment, withOtherTeam: manual.get(key) === 'other_team' }
+    }
     return { status: manual.get(key) }
   }
 }

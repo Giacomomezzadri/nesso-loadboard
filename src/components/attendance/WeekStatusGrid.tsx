@@ -46,7 +46,7 @@ function sessionTitle(s: Session): string {
   return s.trainingType ? TRAINING_TYPE_LABEL[s.trainingType] : 'Allenamento'
 }
 
-function StatusChip({ status, title }: { status?: PlayerSessionStatus; title: string }) {
+function StatusChip({ status, title, withOtherTeam }: { status?: PlayerSessionStatus; title: string; withOtherTeam?: boolean }) {
   if (!status) {
     return (
       <span title={title} className="flex h-5 min-w-6 items-center justify-center rounded text-[10px] text-ink-muted/60">
@@ -58,7 +58,11 @@ function StatusChip({ status, title }: { status?: PlayerSessionStatus; title: st
   return (
     <span
       title={title}
-      className={cn('flex h-5 min-w-6 items-center justify-center rounded px-1 text-[10px] font-semibold leading-none', style.className)}
+      className={cn(
+        'flex h-5 min-w-6 items-center justify-center rounded px-1 text-[10px] font-semibold leading-none',
+        style.className,
+        withOtherTeam && 'ring-2 ring-series-aqua ring-inset',
+      )}
     >
       {style.code}
     </span>
@@ -116,10 +120,16 @@ export function WeekStatusGrid({
     let present = 0
     const byDay = days.map((d) =>
       (sessionsByDay.get(d) ?? []).map((s) => {
-        const { status, segment } = resolve(s, p.id)
+        const { status, segment, withOtherTeam } = resolve(s, p.id)
         if (status === 'present') present++
         const minutes = s.type === 'match' && segment ? ` · ${formatNumber(segment.durationSec / 60)}′` : ''
-        return { session: s, status, title: `${p.displayName} — ${sessionTitle(s)}: ${status ? PLAYER_STATUS_LABEL[status] : 'non registrato'}${minutes}` }
+        const where = withOtherTeam ? ' (con altra squadra)' : ''
+        return {
+          session: s,
+          status,
+          withOtherTeam,
+          title: `${p.displayName} — ${sessionTitle(s)}: ${status ? PLAYER_STATUS_LABEL[status] : 'non registrato'}${where}${minutes}`,
+        }
       }),
     )
     return { player: p, byDay, present }
@@ -253,7 +263,7 @@ export function WeekStatusGrid({
                     >
                       <div className="flex justify-center gap-0.5">
                         {entries.map((e) => (
-                          <StatusChip key={e.session.id} status={e.status} title={e.title} />
+                          <StatusChip key={e.session.id} status={e.status} title={e.title} withOtherTeam={e.withOtherTeam} />
                         ))}
                       </div>
                     </td>

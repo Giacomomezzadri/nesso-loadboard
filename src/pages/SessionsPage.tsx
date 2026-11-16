@@ -1,4 +1,4 @@
-import { Gauge, Pencil, Trash2, Upload } from 'lucide-react'
+import { Combine, Gauge, Pencil, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImportWizard } from '../import/ImportWizard'
@@ -6,7 +6,7 @@ import { AnthropometryImport } from '../import/AnthropometryImport'
 import { JumpTestImport } from '../import/JumpTestImport'
 import { EmptyState } from '../components/ui/EmptyState'
 import { buildRpeEntries } from '../lib/csv/importSession'
-import { deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
+import { addPlayersToSession, deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
 import { useAuth } from '../state/AuthContext'
 import {
   useInvalidateAfterImport,
@@ -24,6 +24,8 @@ import {
   TRAINING_TYPE_LABEL,
   type MatchLocation,
   type MatchResult,
+  type DrillSegment,
+  type RpeEntry,
   type Session,
   type SessionType,
   type TrainingType,
@@ -41,7 +43,7 @@ const TRAINING_TYPES: TrainingType[] = [
 const MATCH_RESULTS: MatchResult[] = ['win', 'draw', 'loss']
 const MATCH_LOCATIONS: MatchLocation[] = ['home', 'away', 'away_2d']
 
-type Panel = 'none' | 'edit' | 'rpe'
+type Panel = 'none' | 'edit' | 'rpe' | 'merge'
 
 function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }) {
   const { data: rpe = [] } = useRpeBySessionQuery(session.id)
@@ -62,7 +64,7 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
   const [savingMeta, setSavingMeta] = useState(false)
   const [metaError, setMetaError] = useState<string | null>(null)
 
-  const { data: segments = [] } = useSegmentsBySessionQuery(panel === 'rpe' ? session.id : undefined)
+  const { data: segments = [] } = useSegmentsBySessionQuery(panel === 'rpe' || panel === 'merge' ? session.id : undefined)
   const [rpeDraft, setRpeDraft] = useState<Record<string, number>>({})
   const [savingRpe, setSavingRpe] = useState(false)
   const [rpeError, setRpeError] = useState<string | null>(null)
@@ -71,6 +73,10 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
   const involvedPlayerIds = [...new Set(segments.map((s) => s.playerId))]
     .filter((id) => playerById.get(id)?.active !== false)
     .sort((a, b) => (playerById.get(a)?.displayName ?? a).localeCompare(playerById.get(b)?.displayName ?? b))
+
+  function toggleMerge() {
+    setPanel(panel === 'merge' ? 'none' : 'merge')
+  }
 
   function toggleEdit() {
     if (panel !== 'edit') {
@@ -194,6 +200,14 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
               </button>
               <button
                 type="button"
+                onClick={toggleMerge}
+                title="Sposta i giocatori di questa sessione in un'altra dello stesso giorno"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
+              >
+                <Combine className="size-3.5" /> Unisci a…
+              </button>
+              <button
+                type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10 disabled:opacity-60"
@@ -311,6 +325,14 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
         </tr>
       )}
 
+      {panel === 'merge' && (
+        <tr className="border-b border-border bg-page/40">
+          <td colSpan={7} className="px-4 py-3">
+            <MergePanel session={session} segments={segments} rpe={rpe} onDone={() => setPanel('none')} />
+          </td>
+        </tr>
+      )}
+
       {panel === 'rpe' && (
         <tr className="border-b border-border bg-page/40">
           <td colSpan={7} className="px-4 py-3">
@@ -357,6 +379,139 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
         </tr>
       )}
     </>
+  )
+}
+
+/**
+ * Moves the chosen players of this session into another session of the same day, then deletes
+ * this one — for a second export (another squad's) imported as its own session, which made the
+ * day count two team trainings. Players already in the other session are replaced only if picked.
+ */
+function MergePanel({ session, segments, rpe, onDone }: { session: Session; segments: DrillSegment[]; rpe: RpeEntry[]; onDone: () => void }) {
+  const { data: sessions = [] } = useSessionsQuery()
+  const { data: players = [] } = usePlayersQuery()
+  const invalidate = useInvalidateAfterImport()
+  const candidates = sessions.filter((s) => s.id !== session.id && s.date === session.date)
+  const [targetId, setTargetId] = useState(candidates.length === 1 ? candidates[0].id : '')
+  const target = candidates.find((s) => s.id === targetId)
+  const { data: targetSegments, isLoading: loadingTarget } = useSegmentsBySessionQuery(target?.id)
+  // Absent = default (everyone not already in the target session).
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
+  const [markOtherTeam, setMarkOtherTeam] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const nameOf = (id: string) => players.find((p) => p.id === id)?.displayName ?? id
+  const inTarget = new Set((targetSegments ?? []).map((s) => s.playerId))
+  const sourcePlayerIds = [...new Set(segments.map((s) => s.playerId))].sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
+  const isPicked = (id: string) => picked[id] ?? !inTarget.has(id)
+  const chosen = sourcePlayerIds.filter(isPicked)
+
+  if (candidates.length === 0) {
+    return (
+      <div className="flex items-center justify-between gap-3 text-xs text-ink-muted">
+        Non ci sono altre sessioni il {session.date}: non c'è niente a cui unirla.
+        <button type="button" onClick={onDone} className="rounded-md px-3 py-1.5 text-ink-secondary hover:bg-ink/5">
+          Chiudi
+        </button>
+      </div>
+    )
+  }
+
+  async function merge() {
+    if (!target || chosen.length === 0) return
+    const confirmed = window.confirm(
+      `Spostare ${chosen.length} ${chosen.length === 1 ? 'giocatore' : 'giocatori'} in "${target.label}" ed eliminare la sessione "${session.label}"? I giocatori non selezionati vengono eliminati con lei.`,
+    )
+    if (!confirmed) return
+    setSaving(true)
+    setError(null)
+    try {
+      const keep = new Set(chosen)
+      // Segment ids are `${sessionId}:${playerId}:${drill}`, RPE ids `${sessionId}:${playerId}`.
+      const movedSegments = segments
+        .filter((seg) => keep.has(seg.playerId))
+        .map((seg) => ({ ...seg, id: target.id + seg.id.slice(session.id.length), sessionId: target.id }))
+      const movedRpe = rpe
+        .filter((e) => keep.has(e.playerId))
+        .map((e) => ({ ...e, id: `${target.id}:${e.playerId}`, sessionId: target.id }))
+      await addPlayersToSession(target.id, movedSegments, movedRpe, markOtherTeam)
+      await deleteSession(session.id)
+      invalidate()
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore imprevisto durante l'unione.")
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 text-xs">
+      <label className="flex flex-col gap-1">
+        <span className="font-medium text-ink-secondary">Unisci a</span>
+        <select
+          value={targetId}
+          onChange={(e) => {
+            setTargetId(e.target.value)
+            setPicked({})
+          }}
+          className="max-w-md rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+        >
+          {!target && <option value="">— Scegli la sessione della squadra —</option>}
+          {candidates.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label} ({c.type === 'match' ? 'Partita' : c.trainingType ? TRAINING_TYPE_LABEL[c.trainingType] : 'Allenamento'})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {target && (loadingTarget || segments.length === 0) && <p className="text-ink-muted">Caricamento giocatori…</p>}
+      {target && !loadingTarget && segments.length > 0 && (
+        <>
+          <p className="text-ink-secondary">
+            Giocatori da spostare in "{target.label}" (preselezionati quelli che lì non hanno ancora dati):
+          </p>
+          <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+            {sourcePlayerIds.map((id) => (
+              <label key={id} className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isPicked(id)}
+                  onChange={() => setPicked((prev) => ({ ...prev, [id]: !isPicked(id) }))}
+                  className="size-3.5 accent-primary"
+                />
+                <span className="truncate text-ink">{nameOf(id)}</span>
+                {inTarget.has(id) && (
+                  <span className={isPicked(id) ? 'text-status-serious' : 'text-ink-muted'}>
+                    {isPicked(id) ? 'sostituisce i suoi dati' : 'già presente'}
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-ink-secondary">
+            <input type="checkbox" checked={markOtherTeam} onChange={(e) => setMarkOtherTeam(e.target.checked)} className="size-3.5 accent-primary" />
+            Si sono allenati con un'altra squadra (restano presenti, segnati "con altra squadra" nella griglia presenze)
+          </label>
+        </>
+      )}
+
+      {error && <p className="text-status-critical">Unione non riuscita: {error}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onDone} className="rounded-md px-3 py-1.5 text-ink-secondary hover:bg-ink/5">
+          Annulla
+        </button>
+        <button
+          type="button"
+          onClick={merge}
+          disabled={!target || chosen.length === 0 || saving || loadingTarget}
+          className="rounded-md bg-accent px-3 py-1.5 font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+        >
+          {saving ? 'Unione…' : `Unisci ${chosen.length} ed elimina questa sessione`}
+        </button>
+      </div>
+    </div>
   )
 }
 

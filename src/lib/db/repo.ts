@@ -100,6 +100,14 @@ export async function putSegments(segments: DrillSegment[]): Promise<void> {
   await apiFetch('/api/segments/bulk', { method: 'POST', body: JSON.stringify(segments) })
 }
 
+/**
+ * Adds players' segments and RPE to an existing session (replacing any data of theirs already
+ * there) — see functions/api/sessions/add-players.ts.
+ */
+export async function addPlayersToSession(sessionId: string, segments: DrillSegment[], rpe: RpeEntry[], markOtherTeam: boolean): Promise<void> {
+  await apiFetch('/api/sessions/add-players', { method: 'POST', body: JSON.stringify({ sessionId, segments, rpe, markOtherTeam }) })
+}
+
 // ---------- rpe ----------
 
 export async function listRpeBySession(sessionId: string): Promise<RpeEntry[]> {

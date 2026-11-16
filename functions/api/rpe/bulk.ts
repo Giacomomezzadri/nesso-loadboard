@@ -2,14 +2,8 @@ import type { AppData } from '../../_lib/auth'
 import { badRequest, json } from '../../_lib/json'
 import { type Env, rpeToRow } from '../../_lib/mappers'
 import { ensureColumns } from '../../_lib/schema'
+import { RPE_UPSERT_SQL as UPSERT_SQL } from '../../_lib/sessionWrites'
 import type { RpeEntry } from '../../../src/types/domain'
-
-const UPSERT_SQL = `
-  INSERT INTO rpe (id, workspace_id, session_id, player_id, rpe, s_rpe, entered_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT(id) DO UPDATE SET rpe = excluded.rpe, s_rpe = excluded.s_rpe, entered_at = excluded.entered_at
-  WHERE rpe.workspace_id = excluded.workspace_id
-`
 
 export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ request, env, data }) => {
   const entries = (await request.json()) as RpeEntry[]

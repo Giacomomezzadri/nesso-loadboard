@@ -1,5 +1,5 @@
 import type { DrillSegment, MatchLocation, MatchResult, Player, PlayerSessionStatus, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
-import { listPlayers, putPlayer, putPlayerStatuses, putRpeEntries, putSegments, putSession } from '../db/repo'
+import { addPlayersToSession, listPlayers, putPlayer, putPlayerStatuses, putRpeEntries, putSegments, putSession } from '../db/repo'
 import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
 import { reconcileRows } from './reconcile'
@@ -56,11 +56,26 @@ export interface StagedImport {
   reconciliation: ReassignmentAudit[]
 }
 
-/** Parse + reconcile + build segments in-memory, without touching the API yet. */
-export async function stageImport(fileText: string, fileName: string, metadata: SessionMetadataInput): Promise<StagedImport> {
-  const sessionId = crypto.randomUUID()
+/** Every player name in an export, after reconciliation — for picking who to import. */
+export function listCsvPlayerNames(fileText: string): string[] {
+  const { rows } = reconcileRows(parseSessionCsv(fileText).rows)
+  return [...new Set(rows.map((r) => r.playerDisplayName))].sort((a, b) => a.localeCompare(b))
+}
+
+export interface StageOptions {
+  /** Build the segments for this existing session instead of a new one. */
+  sessionId?: string
+  /** Import only these export names; the rest is ignored and never added to the roster. */
+  includeNames?: Set<string>
+}
+
+/** Parse + reconcile + build segments in-memory. Only touches the API to resolve (or create) the imported players. */
+export async function stageImport(fileText: string, fileName: string, metadata: SessionMetadataInput, options: StageOptions = {}): Promise<StagedImport> {
+  const sessionId = options.sessionId ?? crypto.randomUUID()
   const parsed = parseSessionCsv(fileText)
-  const { rows, audits } = reconcileRows(parsed.rows)
+  const { rows: allRows, audits } = reconcileRows(parsed.rows)
+  // Filter after reconciliation: it needs every row to spot misattributed ones.
+  const rows = options.includeNames ? allRows.filter((r) => options.includeNames!.has(r.playerDisplayName)) : allRows
   const { segments, warnings } = await buildSegmentsForSession(sessionId, rows, metadata.type)
 
   const reconciliationWarnings = audits.map((a) => a.reason)
@@ -112,6 +127,17 @@ export async function commitImport(
   await updatePersonalBests(staged.segments)
 
   return session
+}
+
+/**
+ * Persist a staged import into the existing session it was staged for (StageOptions.sessionId):
+ * one session for the day, not two. See functions/api/sessions/add-players.ts.
+ */
+export async function commitIntoSession(staged: StagedImport, rpeByPlayerId: Record<string, number>, markOtherTeam: boolean): Promise<void> {
+  if (staged.segments.length === 0) return
+  const rpe = buildRpeEntries(staged.sessionId, staged.segments, rpeByPlayerId)
+  await addPlayersToSession(staged.sessionId, staged.segments, rpe, markOtherTeam)
+  await updatePersonalBests(staged.segments)
 }
 
 /** Auto-updates a player's recorded max speed when this session beats it — flips pbConfirmed to false so it surfaces on the Data Quality page until a human checks it. */
