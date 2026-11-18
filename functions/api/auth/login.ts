@@ -21,8 +21,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const userAgent = request.headers.get('user-agent')
 
   // The checkbox is `required` in the form, but the browser is not the gate.
-  if (form.get('terms') !== 'accepted') {
-    return loginPage(returnPath, email, 'Per accedere devi accettare i Termini di utilizzo e l’Informativa privacy.')
+  if (form.get('terms') !== 'accepted' || form.get('clauses') !== 'approved') {
+    return loginPage(
+      returnPath,
+      email,
+      'Per accedere devi accettare i Termini e Condizioni e l’Informativa Privacy e approvare le clausole specifiche.',
+    )
   }
 
   let user: UserRow | null

@@ -1,5 +1,5 @@
 import type { Env } from './mappers'
-import { TERMS_PATH } from './terms'
+import { CLAUSES_CHECKBOX_LABEL, TERMS_PATH } from './terms'
 
 /**
  * Multi-user auth: email + password accounts with three roles, backed by D1.
@@ -272,7 +272,12 @@ export function loginPage(returnPath: string, prefillEmail = '', error?: string)
       <div class="terms">
         <input id="terms" name="terms" type="checkbox" value="accepted" required />
         <label for="terms">Ho letto e accetto i
-          <a href="${TERMS_PATH}" target="_blank" rel="noopener">Termini di utilizzo e l'Informativa privacy</a>.</label>
+          <a href="${TERMS_PATH}#termini" target="_blank" rel="noopener">Termini e Condizioni</a> e
+          l’<a href="${TERMS_PATH}#privacy" target="_blank" rel="noopener">Informativa Privacy</a>.</label>
+      </div>
+      <div class="terms">
+        <input id="clauses" name="clauses" type="checkbox" value="approved" required />
+        <label for="clauses">${CLAUSES_CHECKBOX_LABEL}</label>
       </div>
       <button type="submit">Entra</button>
     </form>
