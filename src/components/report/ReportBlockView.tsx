@@ -11,6 +11,7 @@ import { PlayerProfilePage } from '../../pages/PlayerProfilePage'
 import { RosterPage } from '../../pages/RosterPage'
 import { SessionVGamePage } from '../../pages/SessionVGamePage'
 import { SessionVSessionPage } from '../../pages/SessionVSessionPage'
+import { WellnessPage } from '../../pages/WellnessPage'
 import type { DrillSegment, Player, ReportBlock, Session } from '../../types/domain'
 import { WeekStatusGrid } from '../attendance/WeekStatusGrid'
 import { ReportSectionProvider } from './ReportSection'
@@ -34,6 +35,7 @@ const PAGES: Record<string, ComponentType> = {
   alerts: AlertsPage,
   leaderboard: LeaderboardPage,
   roster: RosterPage,
+  wellness: WellnessPage,
 }
 
 /**

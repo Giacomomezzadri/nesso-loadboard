@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronLeft, ChevronRight, Copy, Link2, MessageCircle, Moon, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { TrendLine } from '../components/charts/TrendLine'
+import { useReportSection } from '../components/report/ReportSection'
 import { StatTile } from '../components/ui/StatTile'
 import { disableWellnessLink, regenerateWellnessLink } from '../lib/db/repo'
 import { cn, formatNumber } from '../lib/utils'
@@ -146,6 +147,7 @@ function LinkPanel() {
 
 export function WellnessPage() {
   const { data: entries = [], isLoading } = useWellnessQuery()
+  const { inReport, show } = useReportSection()
   const { data: players = [] } = usePlayersQuery()
   const today = romeTodayIso()
   const [date, setDate] = useState(today)
@@ -186,8 +188,10 @@ export function WellnessPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <LinkPanel />
+      {!inReport && <LinkPanel />}
 
+      {show('day') && (
+      <>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" aria-label="Giorno precedente" onClick={() => setDate(addDaysIso(date, -1))} className="rounded-md border border-border p-2">
           <ChevronLeft className="size-4" />
@@ -302,8 +306,10 @@ export function WellnessPage() {
           </div>
         )}
       </section>
+      </>
+      )}
 
-      {trend.length > 1 && (
+      {show('trend') && trend.length > 1 && (
         <section className="panel p-4">
           <p className="font-display mb-1 text-base font-medium text-ink">Wellness medio squadra · ultimi {BASELINE_DAYS} giorni</p>
           <p className="mb-2 text-xs text-ink-muted">Media del totale (5–25) di chi ha risposto ogni giorno.</p>

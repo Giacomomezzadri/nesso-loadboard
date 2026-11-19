@@ -62,6 +62,9 @@ export const REPORT_BLOCKS: Record<ReportBlockKind, ReportBlockDef> = {
 
   'alerts.table': { group: 'Alerts & Flags', label: 'Tabella alert', description: 'Tutti gli alert della sessione selezionata.', options: {} },
 
+  'wellness.day': { group: 'Wellness', label: 'Wellness del giorno', description: 'Risposte di tutta la squadra nel giorno scelto (ore di sonno, sonno, stress, fatica, dolore, umore), colorate, con chi non ha risposto.', options: {} },
+  'wellness.trend': { group: 'Wellness', label: 'Wellness medio squadra', description: 'Media del punteggio wellness della squadra negli ultimi 28 giorni.', options: {} },
+
   'leaderboard.ranking': { group: 'Leaderboard', label: 'Classifica', description: 'Classifica sulla metrica e sul periodo scelti.', options: {} },
   'leaderboard.scatter': { group: 'Leaderboard', label: 'Scatterplot', description: 'Due variabili a confronto per tutti i giocatori.', options: {} },
 
