@@ -134,7 +134,7 @@ const STYLE = `
 
 function page(title: string, body: string, status = 200): Response {
   const html = `<!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -153,11 +153,11 @@ function page(title: string, body: string, status = 200): Response {
 
 export function invalidLinkPage(): Response {
   return page(
-    'Link non valido',
+    'Invalid link',
     `<h1>Wellness</h1>
      <div class="card done"><p class="big">🔒</p>
-       <p>Questo link non è più attivo.</p>
-       <p class="hint">Chiedi al preparatore il link aggiornato.</p></div>`,
+       <p>This link is no longer active.</p>
+       <p class="hint">Ask your fitness coach for the new link.</p></div>`,
     404,
   )
 }
@@ -187,30 +187,30 @@ export function wellnessFormPage(opts: {
   ).join('')
 
   return page(
-    'Wellness mattutino',
+    'Morning wellness',
     `<h1>Wellness</h1>
-     <p class="sub">Questionario del mattino · ${escapeHtml(opts.dateLabel)}<br />Rispondi appena sveglio, ci vuole meno di un minuto.</p>
+     <p class="sub">Morning questionnaire · ${escapeHtml(opts.dateLabel)}<br />Fill it in as soon as you wake up — it takes less than a minute.</p>
      ${opts.error ? `<p class="error" role="alert">${escapeHtml(opts.error)}</p>` : ''}
      <form method="POST" action="${escapeHtml(opts.formAction)}">
        <div class="card">
-         <label class="lbl" for="player">Chi sei?</label>
+         <label class="lbl" for="player">Who are you?</label>
          <select id="player" name="player" required>
-           <option value="" disabled selected>Scegli il tuo nome</option>
+           <option value="" disabled selected>Choose your name</option>
            ${options}
          </select>
        </div>
        <div class="card">
-         <label class="lbl" for="sleep_hours">Quante ore hai dormito?</label>
-         <input id="sleep_hours" name="sleep_hours" type="number" inputmode="decimal" min="0" max="${SLEEP_HOURS_MAX}" step="0.5" required placeholder="Es. 7.5" />
-         <p class="hint">Ore effettive di sonno, a mezz'ora (7.5 = sette ore e mezza).</p>
+         <label class="lbl" for="sleep_hours">How many hours did you sleep?</label>
+         <input id="sleep_hours" name="sleep_hours" type="number" inputmode="decimal" min="0" max="${SLEEP_HOURS_MAX}" step="0.5" required placeholder="e.g. 7.5" />
+         <p class="hint">Actual hours of sleep, in half hours (7.5 = seven and a half hours).</p>
        </div>
        ${items}
        <div class="card">
-         <label class="lbl" for="note">Note <span style="font-weight:400;color:var(--ink-muted)">(facoltativo)</span></label>
-         <textarea id="note" name="note" maxlength="${WELLNESS_NOTE_MAX}" placeholder="Es. dolore al polpaccio destro, dormito poco per il viaggio…"></textarea>
+         <label class="lbl" for="note">Notes <span style="font-weight:400;color:var(--ink-muted)">(optional)</span></label>
+         <textarea id="note" name="note" maxlength="${WELLNESS_NOTE_MAX}" placeholder="e.g. right calf pain, short sleep because of travel…"></textarea>
        </div>
-       <button type="submit">Invia</button>
-       <p class="hint">Le risposte sono visibili solo allo staff. Se invii di nuovo oggi, sostituisci le risposte precedenti.</p>
+       <button type="submit">Submit</button>
+       <p class="hint">Your answers are visible to the staff only. Submitting again today replaces your previous answers.</p>
      </form>
      <script>
        // Remember who filled it in on this phone, so tomorrow the name is already chosen.
@@ -228,20 +228,20 @@ export function wellnessFormPage(opts: {
 
 export function wellnessThanksPage(opts: { playerName: string; dateLabel: string; formAction: string }): Response {
   return page(
-    'Risposte inviate',
+    'Answers submitted',
     `<h1>Wellness</h1>
      <div class="card done"><p class="big">✅</p>
-       <p>Grazie <strong>${escapeHtml(opts.playerName)}</strong>, risposte registrate per ${escapeHtml(opts.dateLabel)}.</p>
-       <p class="hint"><a href="${escapeHtml(opts.formAction)}">Hai sbagliato qualcosa? Compila di nuovo</a></p></div>`,
+       <p>Thanks <strong>${escapeHtml(opts.playerName)}</strong>, your answers for ${escapeHtml(opts.dateLabel)} have been saved.</p>
+       <p class="hint"><a href="${escapeHtml(opts.formAction)}">Made a mistake? Fill it in again</a></p></div>`,
   )
 }
 
 export function wellnessErrorPage(message: string, formAction: string): Response {
   return page(
-    'Errore',
+    'Error',
     `<h1>Wellness</h1>
      <p class="error" role="alert">${escapeHtml(message)}</p>
-     <p><a href="${escapeHtml(formAction)}">Torna al questionario</a></p>`,
+     <p><a href="${escapeHtml(formAction)}">Back to the questionnaire</a></p>`,
     400,
   )
 }

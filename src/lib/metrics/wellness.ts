@@ -18,11 +18,11 @@ export interface WellnessItemDef {
 }
 
 export const WELLNESS_ITEMS: WellnessItemDef[] = [
-  { key: 'sleep', label: 'Sonno', question: 'Come hai dormito stanotte?', answers: ['Malissimo', 'Male', 'Normale', 'Bene', 'Benissimo'] },
-  { key: 'stress', label: 'Stress', question: 'Quanto ti senti stressato?', answers: ['Moltissimo', 'Molto', 'Normale', 'Poco', 'Per niente'] },
-  { key: 'fatigue', label: 'Fatica', question: 'Quanto ti senti stanco?', answers: ['Esausto', 'Molto stanco', 'Normale', 'Riposato', 'Freschissimo'] },
-  { key: 'soreness', label: 'Dolore', question: 'Hai dolori muscolari?', answers: ['Molto forti', 'Forti', 'Normali', 'Lievi', 'Nessuno'] },
-  { key: 'mood', label: 'Umore', question: 'Come è il tuo umore?', answers: ['Pessimo', 'Giù', 'Normale', 'Buono', 'Ottimo'] },
+  { key: 'sleep', label: 'Sonno', question: 'How well did you sleep last night?', answers: ['Very poor', 'Poor', 'Average', 'Good', 'Very good'] },
+  { key: 'stress', label: 'Stress', question: 'How stressed do you feel?', answers: ['Very high', 'High', 'Normal', 'Low', 'None'] },
+  { key: 'fatigue', label: 'Fatica', question: 'How tired do you feel?', answers: ['Exhausted', 'Very tired', 'Normal', 'Rested', 'Very fresh'] },
+  { key: 'soreness', label: 'Dolore', question: 'How sore are your muscles?', answers: ['Very severe', 'Severe', 'Normal', 'Mild', 'None'] },
+  { key: 'mood', label: 'Umore', question: 'How is your mood?', answers: ['Very bad', 'Down', 'Normal', 'Good', 'Very good'] },
 ]
 
 /** Faces for 1…5 — same row for every item, since 5 is always the good end. */

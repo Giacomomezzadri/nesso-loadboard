@@ -17,7 +17,7 @@ import {
  */
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{20,100}$/
-const DATE_LABEL = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+const DATE_LABEL = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 
 async function workspaceForToken(env: Env, token: string): Promise<string | null> {
   if (!TOKEN_SHAPE.test(token)) return null
@@ -56,22 +56,22 @@ export const onRequestPost: PagesFunction<Env, 'token'> = async ({ request, env,
   try {
     form = await request.formData()
   } catch {
-    return wellnessErrorPage('Invio non valido, riprova.', formAction)
+    return wellnessErrorPage('Invalid submission, please try again.', formAction)
   }
 
   const playerId = String(form.get('player') ?? '')
   const player = (await activePlayers(env, workspaceId)).find((p) => p.id === playerId)
-  if (!player) return wellnessErrorPage('Scegli il tuo nome dalla lista.', formAction)
+  if (!player) return wellnessErrorPage('Choose your name from the list.', formAction)
 
   const scores: number[] = []
   for (const item of WELLNESS_ITEMS) {
     const value = Number(form.get(item.key))
-    if (!isValidWellnessScore(value)) return wellnessErrorPage(`Rispondi a tutte le domande (manca "${item.label}").`, formAction)
+    if (!isValidWellnessScore(value)) return wellnessErrorPage(`Please answer every question (missing: "${item.question}").`, formAction)
     scores.push(value)
   }
   const rawHours = String(form.get('sleep_hours') ?? '').trim().replace(',', '.')
   const sleepHours = rawHours === '' ? NaN : Number(rawHours)
-  if (!isValidSleepHours(sleepHours)) return wellnessErrorPage('Indica quante ore hai dormito (da 0 a 16).', formAction)
+  if (!isValidSleepHours(sleepHours)) return wellnessErrorPage('Enter how many hours you slept (0 to 16).', formAction)
   const note = String(form.get('note') ?? '').trim().slice(0, WELLNESS_NOTE_MAX) || null
 
   const date = romeTodayIso()
