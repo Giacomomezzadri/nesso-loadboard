@@ -52,6 +52,7 @@ export const REPORT_BLOCKS: Record<ReportBlockKind, ReportBlockDef> = {
 
   'profile.tiles': { group: 'Player Profile', label: 'Riquadri giocatore', description: 'Sessioni e presenze, minuti in partita, distanza settimanale, Vmax.', options: {} },
   'profile.jump_tests': { group: 'Player Profile', label: 'Test di salto', description: 'Ultimo CMJ e Drop Jump con asimmetrie.', options: {} },
+  'profile.wellness': { group: 'Player Profile', label: 'Wellness mattutino', description: 'Ultimo questionario (sonno, stress, fatica, dolore, umore) e andamento di 28 giorni accanto al carico.', options: {} },
   'profile.body': { group: 'Player Profile', label: 'Composizione corporea', description: 'Massa grassa, plicometria e massa muscolare con la variazione dall\'ultima misurazione.', options: {} },
   'profile.alerts': { group: 'Player Profile', label: 'Alert del giocatore', description: 'Alert del giocatore nella sessione selezionata.', options: {} },
   'profile.microcycle': { group: 'Player Profile', label: 'Microciclo del giocatore', description: 'Completamento del microciclo attuale, metrica per metrica.', options: {} },

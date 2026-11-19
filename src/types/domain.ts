@@ -143,6 +143,32 @@ export interface AnthropometryRecord {
   muscleMassMethod?: string
 }
 
+/**
+ * One morning wellness questionnaire, filled in by the athlete from the team link. One per
+ * player per day (re-submitting the same day replaces it). Every item is 1–5, 5 = good end.
+ */
+export interface WellnessEntry {
+  playerId: string
+  date: string // ISO "YYYY-MM-DD", Europe/Rome day of submission
+  sleep: number
+  stress: number
+  fatigue: number
+  soreness: number
+  mood: number
+  /** Hours slept, in half hours (0–16). Not part of the 5–25 score. */
+  sleepHours?: number
+  note?: string
+  submittedAt: string
+}
+
+export type WellnessItemKey = 'sleep' | 'stress' | 'fatigue' | 'soreness' | 'mood'
+
+/** The team's public questionnaire link, or null when none is active. */
+export interface WellnessLink {
+  token: string
+  createdAt: string
+}
+
 /** A hand-made pairing of an externally spelled name (normalized) to a roster player. */
 export interface PlayerAlias {
   aliasKey: string
@@ -402,6 +428,7 @@ export type ReportBlockKind =
   | 'compare.internal'
   | 'profile.tiles'
   | 'profile.jump_tests'
+  | 'profile.wellness'
   | 'profile.body'
   | 'profile.alerts'
   | 'profile.microcycle'

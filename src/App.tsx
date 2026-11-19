@@ -16,6 +16,7 @@ import { SessionsPage } from './pages/SessionsPage'
 import { SessionVGamePage } from './pages/SessionVGamePage'
 import { SessionVSessionPage } from './pages/SessionVSessionPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { WellnessPage } from './pages/WellnessPage'
 import { useAuth } from './state/AuthContext'
 
 export function App() {
@@ -37,6 +38,7 @@ export function App() {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/players" element={<PlayerProfilePage />} />
         <Route path="/alerts" element={<AlertsPage />} />
+        <Route path="/wellness" element={<WellnessPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/quality" element={<DataQualityPage />} />
         <Route path="/roster" element={<RosterPage />} />

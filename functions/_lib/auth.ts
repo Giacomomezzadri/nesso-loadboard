@@ -53,7 +53,7 @@ async function sha256Hex(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function randomToken(): string {
+export function randomToken(): string {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
 }
 
@@ -158,7 +158,7 @@ export function safeReturnPath(candidate: string | null): string {
   return candidate
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

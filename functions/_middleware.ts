@@ -2,6 +2,7 @@ import { loginPage, resolveSession, safeReturnPath, schemaNotReady, type AppData
 import { forbidden, json } from './_lib/json'
 import type { Env } from './_lib/mappers'
 import { TERMS_PATH } from './_lib/terms'
+import { WELLNESS_FORM_PREFIX } from './_lib/wellness'
 
 /**
  * Whole-site auth gate.
@@ -34,6 +35,10 @@ export const onRequest: PagesFunction<Env, string, AppData> = async ({ request, 
 
   // The login endpoint has to stay reachable or there is no way back in.
   if (PUBLIC_PATHS.has(url.pathname)) return next()
+  // The athletes' wellness questionnaire: no account, the unguessable token in the path is
+  // the credential, and functions/q/[token].ts can only read the roster names and write
+  // wellness answers for that one workspace.
+  if (url.pathname.startsWith(WELLNESS_FORM_PREFIX)) return next()
 
   let auth
   try {

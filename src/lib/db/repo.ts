@@ -10,6 +10,8 @@ import type {
   PlayerStatusEntry,
   RpeEntry,
   Session,
+  WellnessEntry,
+  WellnessLink,
 } from '../../types/domain'
 
 const DEFAULT_TIMEOUT_MS = 25000
@@ -172,6 +174,25 @@ export async function putPlayerStatuses(
   statuses: { playerId: string; status: PlayerSessionStatus }[],
 ): Promise<void> {
   await apiFetch('/api/player-statuses/bulk', { method: 'POST', body: JSON.stringify({ sessionId, statuses }) })
+}
+
+// ---------- wellness ----------
+
+export async function listWellness(): Promise<WellnessEntry[]> {
+  return apiFetch<WellnessEntry[]>('/api/wellness')
+}
+
+export async function getWellnessLink(): Promise<WellnessLink | null> {
+  return apiFetch<WellnessLink | null>('/api/wellness/link')
+}
+
+/** Creates the team link, or replaces its token (the old link stops working). */
+export async function regenerateWellnessLink(): Promise<WellnessLink> {
+  return apiFetch<WellnessLink>('/api/wellness/link', { method: 'POST' })
+}
+
+export async function disableWellnessLink(): Promise<void> {
+  await apiFetch('/api/wellness/link', { method: 'DELETE' })
 }
 
 // ---------- body composition ----------
