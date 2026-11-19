@@ -15,6 +15,8 @@ import {
   listPlannedDays,
   listPlayerAliases,
   listPlayerStatuses,
+  getWellnessLink,
+  listWellness,
 } from '../lib/db/repo'
 
 export const queryKeys = {
@@ -33,6 +35,8 @@ export const queryKeys = {
   playerAliases: ['player-aliases'] as const,
   playerStatuses: ['player-statuses'] as const,
   bodyMeasurements: ['body-measurements'] as const,
+  wellness: ['wellness'] as const,
+  wellnessLink: ['wellness', 'link'] as const,
 }
 
 export function useSessionsQuery() {
@@ -177,4 +181,13 @@ export function useInvalidatePlayerLinks() {
     queryClient.invalidateQueries({ queryKey: queryKeys.playerLinks })
     queryClient.invalidateQueries({ queryKey: queryKeys.linkedPlayerData })
   }
+}
+
+/** Every wellness answer; refetched on focus so answers arriving in the morning show up. */
+export function useWellnessQuery() {
+  return useQuery({ queryKey: queryKeys.wellness, queryFn: listWellness, refetchOnWindowFocus: true })
+}
+
+export function useWellnessLinkQuery() {
+  return useQuery({ queryKey: queryKeys.wellnessLink, queryFn: getWellnessLink })
 }

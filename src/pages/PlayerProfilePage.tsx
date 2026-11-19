@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { TrendBars } from '../components/charts/TrendBars'
 import { TrendLine } from '../components/charts/TrendLine'
 import { JumpTestsPanel } from '../components/jump/JumpTestsPanel'
+import { WellnessPanel } from '../components/wellness/WellnessPanel'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
@@ -37,6 +38,7 @@ import {
   useRpeBySessionQuery,
   useSegmentsByPlayerQuery,
   useSettingsQuery,
+  useWellnessQuery,
 } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
 
@@ -248,6 +250,7 @@ export function PlayerProfilePage() {
   const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
   const { data: jumpTests = [] } = useJumpTestsQuery()
   const { data: rpeEntries = [] } = useAllRpeQuery()
+  const { data: wellnessEntries = [] } = useWellnessQuery()
   const { canEdit } = useAuth()
   const { inReport, show } = useReportSection()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
@@ -297,6 +300,12 @@ export function PlayerProfilePage() {
     .map((s) => ({ segment: s, session: sessionById.get(s.sessionId) }))
     .filter((row): row is { segment: (typeof mergedSegments)[number]; session: NonNullable<(typeof row)['session']> } => !!row.session)
     .sort((a, b) => a.session.date.localeCompare(b.session.date))
+
+  // Training distance per day, drawn under the wellness line (two sessions on a day add up).
+  const dailyDistanceM = new Map<string, number>()
+  for (const { segment, session } of fullSessionSegs) {
+    dailyDistanceM.set(session.date, (dailyDistanceM.get(session.date) ?? 0) + segment.totalDistanceM)
+  }
 
   const rpeIndex = indexRpe(rpeEntries)
   const trendMetrics: TrendMetricSpec[] = [
@@ -574,6 +583,10 @@ export function PlayerProfilePage() {
           {show('body') && activePlayerId && <BodyCompositionPanel playerId={activePlayerId} canEdit={canEdit && !inReport} />}
 
           {show('jump_tests') && activePlayerId && <JumpTestsPanel playerId={activePlayerId} tests={jumpTests} activePlayerIds={activePlayerIdSet} />}
+
+          {show('wellness') && activePlayerId && (
+            <WellnessPanel playerId={activePlayerId} entries={wellnessEntries} dailyDistanceM={dailyDistanceM} />
+          )}
 
           {show('alerts') && currentSession && (
             <div className="panel p-4">
