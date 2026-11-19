@@ -436,6 +436,8 @@ export type ReportBlockKind =
   | 'profile.trend'
   | 'profile.history'
   | 'alerts.table'
+  | 'wellness.day'
+  | 'wellness.trend'
   | 'leaderboard.ranking'
   | 'leaderboard.scatter'
   | 'roster.table'
