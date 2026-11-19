@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { putPlayer } from '../lib/db/repo'
+import { Check, UserPlus, Users } from 'lucide-react'
+import { type FormEvent, useEffect, useState } from 'react'
+import { putPlayer, upsertPlayerByName } from '../lib/db/repo'
 import { matchAvailableSeconds, matchSecondsByPlayer } from '../lib/metrics/attendance'
 import { evaluatePlayerPb } from '../lib/metrics/pb'
-import { formatFraction, formatNumber } from '../lib/utils'
+import { formatFraction, formatNumber, slugifyName } from '../lib/utils'
 import type { Player, Position } from '../types/domain'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useAuth } from '../state/AuthContext'
@@ -79,6 +79,99 @@ function SprintTimeCell({
   )
 }
 
+/**
+ * Adds a player by hand — for someone who has no GPS session yet (new signing, injured,
+ * goalkeeper without a vest) but should already appear e.g. in the wellness form. The id is
+ * derived from the name exactly like a CSV import does, so a later GPS export with the same
+ * spelling lands on this same player instead of creating a duplicate.
+ */
+function AddPlayerForm({ players }: { players: Player[] }) {
+  const queryClient = useQueryClient()
+  const [name, setName] = useState('')
+  const [position, setPosition] = useState<Position>('UNSPECIFIED')
+  const [message, setMessage] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null)
+
+  const add = useMutation({
+    mutationFn: async ({ name, position }: { name: string; position: Position }) => {
+      const player = await upsertPlayerByName(name)
+      if (position !== 'UNSPECIFIED') await putPlayer({ ...player, position })
+      return player
+    },
+    onSuccess: (player) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.players })
+      setMessage({ tone: 'good', text: `${player.displayName} aggiunto al roster.` })
+      setName('')
+      setPosition('UNSPECIFIED')
+    },
+    onError: () => setMessage({ tone: 'bad', text: 'Aggiunta non riuscita, riprova.' }),
+  })
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    const trimmed = name.trim().replace(/\s+/g, ' ')
+    const slug = slugifyName(trimmed)
+    if (!slug) {
+      setMessage({ tone: 'bad', text: 'Il nome deve contenere almeno una lettera o una cifra.' })
+      return
+    }
+    // Same rule as the import: same name up to case/spaces/accents = same player.
+    const existing = players.find((p) => slugifyName(p.displayName) === slug)
+    if (existing) {
+      setMessage({
+        tone: 'bad',
+        text: existing.active
+          ? `${existing.displayName} è già nel roster.`
+          : `${existing.displayName} è già nel roster ma non è attivo: riattivalo dalla tabella.`,
+      })
+      return
+    }
+    setMessage(null)
+    add.mutate({ name: trimmed, position })
+  }
+
+  return (
+    <form onSubmit={submit} className="panel flex flex-col gap-2 p-4">
+      <p className="font-display flex items-center gap-2 text-base font-medium text-ink">
+        <UserPlus className="size-4 text-primary" />
+        Aggiungi giocatore
+      </p>
+      <p className="text-xs text-ink-muted">
+        Scrivi il nome come compare nell'export GPS, così i dati importati in futuro si agganciano a questo giocatore invece di crearne un doppione.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nome e cognome"
+          aria-label="Nome del giocatore"
+          maxLength={80}
+          className="min-w-0 flex-1 rounded-md border border-border bg-page px-3 py-2 text-sm text-ink sm:max-w-xs"
+        />
+        <select
+          value={position}
+          onChange={(e) => setPosition(e.target.value as Position)}
+          aria-label="Posizione"
+          className="rounded-md border border-border bg-page px-2 py-2 text-sm text-ink"
+        >
+          {POSITIONS.map((p) => (
+            <option key={p} value={p}>
+              {POSITION_LABEL[p]}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          disabled={add.isPending || !name.trim()}
+          className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
+        >
+          {add.isPending ? 'Aggiungo…' : 'Aggiungi'}
+        </button>
+      </div>
+      {message && <p className={message.tone === 'good' ? 'text-sm text-status-good' : 'text-sm text-status-critical'}>{message.text}</p>}
+    </form>
+  )
+}
+
 export function RosterPage() {
   const { data: players = [], isLoading } = usePlayersQuery()
   const { canEdit } = useAuth()
@@ -99,16 +192,20 @@ export function RosterPage() {
 
   if (players.length === 0) {
     return (
-      <EmptyState
-        icon={Users}
-        title="Nessun giocatore ancora"
-        description="I giocatori vengono creati automaticamente al primo import di un CSV — importa una sessione per iniziare."
-      />
+      <div className="flex flex-col gap-4">
+        {canEdit && <AddPlayerForm players={players} />}
+        <EmptyState
+          icon={Users}
+          title="Nessun giocatore ancora"
+          description="I giocatori vengono creati automaticamente al primo import di un CSV, oppure puoi aggiungerli a mano qui sopra."
+        />
+      </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {canEdit && <AddPlayerForm players={players} />}
       <p className="text-sm text-ink-secondary">
         {players.length} giocatori. La posizione alimenta i raggruppamenti nelle pagine Drills e Session v Session.
       </p>

@@ -16,6 +16,8 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
   await ensureColumns(env, 'players', [{ name: 'workspace_id', type: 'TEXT' }])
 
   const workspaceId = data.auth.workspaceId as string
+  // A name with no latin letters or digits would slug to '' and collide with every other such name.
+  if (!slugifyName(displayName)) return badRequest('il nome deve contenere almeno una lettera o una cifra')
   // Prefixed with the workspace so two different Editors' rosters can't collide on the same slug
   // (e.g. two different "Mario Rossi") — ids are opaque to the rest of the app either way.
   const id = `${workspaceId}:${slugifyName(displayName)}`
