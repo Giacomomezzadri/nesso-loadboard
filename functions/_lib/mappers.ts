@@ -103,6 +103,7 @@ export function segmentToRow(s: DrillSegment): unknown[] {
     s.warnings ? JSON.stringify(s.warnings) : null,
     s.isSynthesizedFullSession ? 1 : 0,
     s.isRehab ? 1 : 0,
+    s.trainingType ?? null,
   ]
 }
 
@@ -139,6 +140,7 @@ export function rowToSegment(r: Record<string, unknown>): DrillSegment {
     warnings: r.warnings ? JSON.parse(r.warnings as string) : undefined,
     isSynthesizedFullSession: Boolean(r.is_synthesized_full_session),
     isRehab: Boolean(r.is_rehab),
+    trainingType: (r.training_type as DrillSegment['trainingType'] | null) ?? undefined,
   }
 }
 

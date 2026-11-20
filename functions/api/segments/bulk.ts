@@ -12,6 +12,7 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
   await ensureColumns(env, 'segments', [
     { name: 'workspace_id', type: 'TEXT' },
     { name: 'is_rehab', type: 'INTEGER NOT NULL DEFAULT 0' },
+    { name: 'training_type', type: 'TEXT' },
   ])
 
   const workspaceId = data.auth.workspaceId

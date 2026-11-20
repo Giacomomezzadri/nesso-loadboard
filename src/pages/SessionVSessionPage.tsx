@@ -8,7 +8,7 @@ import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/met
 import { TRAINING_LOAD_LABEL, indexRpe, trainingLoadOf } from '../lib/metrics/trainingLoad'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import { TRAINING_TYPE_LABEL, type DrillSegment, type Position } from '../types/domain'
+import { playerTrainingType, TRAINING_TYPE_LABEL, type DrillSegment, type Position, type TrainingType } from '../types/domain'
 
 // Counted as "sessions of this type" INCLUDING the one currently open — a
 // coach counting "I have 3 Forza sessions" naturally counts the one they're
@@ -50,18 +50,24 @@ export function SessionVSessionPage() {
     { key: 'tl', label: `${TRAINING_LOAD_LABEL} (UA)`, getValue: (s) => trainingLoadOf(rpeIndex, s) },
   ]
 
-  const strictByTrainingType = currentSession.type === 'training' && !!currentSession.trainingType && !includeAllTrainingTypes
-
-  const sameTypeSessionIds = new Set(
-    sessions
-      .filter((s) => {
-        if (s.id === currentSession.id || s.type !== currentSession.type) return false
-        if (strictByTrainingType) return s.trainingType === currentSession.trainingType
-        return true
-      })
-      .map((s) => s.id),
-  )
   const currentSegs = segments.filter((s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session')
+  // Some players may have done another type than the session's (merged from another squad's session).
+  const hasPlayerTypes = currentSegs.some((s) => s.trainingType && s.trainingType !== currentSession.trainingType)
+  const canFilterByType = currentSession.type === 'training' && (!!currentSession.trainingType || hasPlayerTypes)
+  const strictByTrainingType = canFilterByType && !includeAllTrainingTypes
+
+  const sessionById = new Map(sessions.map((s) => [s.id, s]))
+  const currentTypeByPlayer = new Map<string, TrainingType | undefined>(
+    currentSegs.map((s) => [s.playerId, playerTrainingType(currentSession, s)]),
+  )
+  /** Same session type and — unless every type is included — the same training type this player did today. */
+  const isComparable = (seg: DrillSegment) => {
+    const s = sessionById.get(seg.sessionId)
+    if (!s || s.id === currentSession.id || s.type !== currentSession.type) return false
+    const wanted = currentTypeByPlayer.get(seg.playerId)
+    if (strictByTrainingType && wanted) return playerTrainingType(s, seg) === wanted
+    return true
+  }
 
   const similarWeeks = show('similar_weeks') ? (
     <SimilarWeeksPanel sessions={sessions} segments={segments} players={players} settings={settings} />
@@ -84,7 +90,7 @@ export function SessionVSessionPage() {
   // The personal median only uses complete sessions: a Rehab day isn't representative of the player's normal load.
   const historyByPlayer = new Map<string, DrillSegment[]>()
   for (const seg of segments) {
-    if (seg.segmentKind === 'full_session' && !seg.isRehab && sameTypeSessionIds.has(seg.sessionId)) {
+    if (seg.segmentKind === 'full_session' && !seg.isRehab && isComparable(seg)) {
       const list = historyByPlayer.get(seg.playerId) ?? []
       list.push(seg)
       historyByPlayer.set(seg.playerId, list)
@@ -124,11 +130,12 @@ export function SessionVSessionPage() {
             {currentSession.type === 'training' && currentSession.trainingType
               ? ` su allenamenti dello stesso tipo (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
               : ` su sessioni dello stesso tipo (${currentSession.type === 'match' ? 'partita' : 'allenamento'})`}
+            {hasPlayerTypes && " — per chi ha svolto un'altra tipologia, sugli allenamenti di quella tipologia"}
             . Servono almeno {MIN_COMPARABLE_TOTAL_SESSIONS} sessioni dello stesso tipo per giocatore (questa inclusa)
             per un confronto affidabile.
           </p>
         </div>
-        {currentSession.type === 'training' && currentSession.trainingType && (
+        {canFilterByType && (
           <label className="flex shrink-0 items-center gap-1.5 text-xs text-ink-secondary">
             <input
               type="checkbox"

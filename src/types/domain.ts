@@ -29,6 +29,12 @@ export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
   amichevole: 'Amichevole',
 }
 
+/** The training type this player actually did in a session: their own override, else the session's. */
+export function playerTrainingType(session: { type: SessionType; trainingType?: TrainingType }, segment?: { trainingType?: TrainingType }): TrainingType | undefined {
+  if (session.type !== 'training') return undefined
+  return segment?.trainingType ?? session.trainingType
+}
+
 /** Outcome of a match session — not applicable to trainings. */
 export type MatchResult = 'win' | 'draw' | 'loss'
 
@@ -340,6 +346,12 @@ export interface DrillSegment {
    *  feed a team-wide average/median/ranking — see isRehabTitle() in
    *  lib/csv/segmentBuilder.ts for the detection rule. */
   isRehab?: boolean
+  /** Set only when this player did a different kind of training from the rest of the session —
+   *  e.g. players merged in from another squad's session of the same day (see MergePanel in
+   *  pages/SessionsPage.tsx). Undefined = the session's own trainingType. Read it through
+   *  playerTrainingType(), never session.trainingType alone, wherever a player's load is
+   *  grouped by training type. */
+  trainingType?: TrainingType
 }
 
 /** Manual RPE entry for one player in one session (Borg CR10 by default). */

@@ -21,6 +21,7 @@ import {
   buildMatchLabel,
   MATCH_LOCATION_LABEL,
   MATCH_RESULT_LABEL,
+  playerTrainingType,
   TRAINING_TYPE_LABEL,
   type MatchLocation,
   type MatchResult,
@@ -386,6 +387,9 @@ function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }
  * Moves the chosen players of this session into another session of the same day, then deletes
  * this one — for a second export (another squad's) imported as its own session, which made the
  * day count two team trainings. Players already in the other session are replaced only if picked.
+ * Each moved player keeps the training type they actually did (stored on their segments when it
+ * differs from the target session's), so they count as present without being filed under the
+ * team's type.
  */
 function MergePanel({ session, segments, rpe, onDone }: { session: Session; segments: DrillSegment[]; rpe: RpeEntry[]; onDone: () => void }) {
   const { data: sessions = [] } = useSessionsQuery()
@@ -398,6 +402,8 @@ function MergePanel({ session, segments, rpe, onDone }: { session: Session; segm
   // Absent = default (everyone not already in the target session).
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   const [markOtherTeam, setMarkOtherTeam] = useState(true)
+  // '' = same type as the target session. Unset = what the player did in this session.
+  const [typeOverride, setTypeOverride] = useState<Record<string, TrainingType | ''>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -406,6 +412,14 @@ function MergePanel({ session, segments, rpe, onDone }: { session: Session; segm
   const sourcePlayerIds = [...new Set(segments.map((s) => s.playerId))].sort((a, b) => nameOf(a).localeCompare(nameOf(b)))
   const isPicked = (id: string) => picked[id] ?? !inTarget.has(id)
   const chosen = sourcePlayerIds.filter(isPicked)
+  const targetIsTraining = target?.type === 'training'
+  const sourceTypeOf = (id: string) => playerTrainingType(session, segments.find((s) => s.playerId === id))
+  const typeOf = (id: string): TrainingType | '' => {
+    if (id in typeOverride) return typeOverride[id]
+    const own = sourceTypeOf(id)
+    return own && own !== target?.trainingType ? own : ''
+  }
+  const typeSelectLabel = `Come la sessione (${target?.trainingType ? TRAINING_TYPE_LABEL[target.trainingType] : 'non classificata'})`
 
   if (candidates.length === 0) {
     return (
@@ -428,10 +442,19 @@ function MergePanel({ session, segments, rpe, onDone }: { session: Session; segm
     setError(null)
     try {
       const keep = new Set(chosen)
+      const ownType = (id: string) => {
+        const t = targetIsTraining ? typeOf(id) : ''
+        return t && t !== target.trainingType ? t : undefined
+      }
       // Segment ids are `${sessionId}:${playerId}:${drill}`, RPE ids `${sessionId}:${playerId}`.
       const movedSegments = segments
         .filter((seg) => keep.has(seg.playerId))
-        .map((seg) => ({ ...seg, id: target.id + seg.id.slice(session.id.length), sessionId: target.id }))
+        .map((seg) => ({
+          ...seg,
+          id: target.id + seg.id.slice(session.id.length),
+          sessionId: target.id,
+          trainingType: ownType(seg.playerId),
+        }))
       const movedRpe = rpe
         .filter((e) => keep.has(e.playerId))
         .map((e) => ({ ...e, id: `${target.id}:${e.playerId}`, sessionId: target.id }))
@@ -454,6 +477,7 @@ function MergePanel({ session, segments, rpe, onDone }: { session: Session; segm
           onChange={(e) => {
             setTargetId(e.target.value)
             setPicked({})
+            setTypeOverride({})
           }}
           className="max-w-md rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
         >
@@ -472,22 +496,60 @@ function MergePanel({ session, segments, rpe, onDone }: { session: Session; segm
           <p className="text-ink-secondary">
             Giocatori da spostare in "{target.label}" (preselezionati quelli che lì non hanno ancora dati):
           </p>
-          <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+          {targetIsTraining && (
+            <label className="flex flex-wrap items-center gap-2 text-ink-secondary">
+              Tipologia svolta da tutti i selezionati:
+              <select
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value === '__same' ? '' : (e.target.value as TrainingType)
+                  setTypeOverride((prev) => ({ ...prev, ...Object.fromEntries(chosen.map((id) => [id, value])) }))
+                }}
+                className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink"
+              >
+                <option value="">— Imposta per tutti —</option>
+                <option value="__same">{typeSelectLabel}</option>
+                {TRAINING_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {TRAINING_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto lg:grid-cols-2">
             {sourcePlayerIds.map((id) => (
-              <label key={id} className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isPicked(id)}
-                  onChange={() => setPicked((prev) => ({ ...prev, [id]: !isPicked(id) }))}
-                  className="size-3.5 accent-primary"
-                />
-                <span className="truncate text-ink">{nameOf(id)}</span>
-                {inTarget.has(id) && (
-                  <span className={isPicked(id) ? 'text-status-serious' : 'text-ink-muted'}>
-                    {isPicked(id) ? 'sostituisce i suoi dati' : 'già presente'}
-                  </span>
+              <div key={id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <label className="flex min-w-0 cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isPicked(id)}
+                    onChange={() => setPicked((prev) => ({ ...prev, [id]: !isPicked(id) }))}
+                    className="size-3.5 accent-primary"
+                  />
+                  <span className="truncate text-ink">{nameOf(id)}</span>
+                  {inTarget.has(id) && (
+                    <span className={isPicked(id) ? 'text-status-serious' : 'text-ink-muted'}>
+                      {isPicked(id) ? 'sostituisce i suoi dati' : 'già presente'}
+                    </span>
+                  )}
+                </label>
+                {targetIsTraining && isPicked(id) && (
+                  <select
+                    value={typeOf(id)}
+                    onChange={(e) => setTypeOverride((prev) => ({ ...prev, [id]: e.target.value as TrainingType | '' }))}
+                    aria-label={`Tipologia svolta da ${nameOf(id)}`}
+                    className="max-w-full rounded-md border border-border bg-surface px-1.5 py-0.5 text-xs text-ink"
+                  >
+                    <option value="">{typeSelectLabel}</option>
+                    {TRAINING_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {TRAINING_TYPE_LABEL[t]}
+                      </option>
+                    ))}
+                  </select>
                 )}
-              </label>
+              </div>
             ))}
           </div>
           <label className="flex items-center gap-2 text-ink-secondary">
