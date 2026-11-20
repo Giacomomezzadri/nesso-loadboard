@@ -123,7 +123,8 @@ export function WeekStatusGrid({
         const { status, segment, withOtherTeam } = resolve(s, p.id)
         if (status === 'present') present++
         const minutes = s.type === 'match' && segment ? ` · ${formatNumber(segment.durationSec / 60)}′` : ''
-        const where = withOtherTeam ? ' (con altra squadra)' : ''
+        const ownType = segment?.trainingType && segment.trainingType !== s.trainingType ? segment.trainingType : undefined
+        const where = (withOtherTeam ? ' (con altra squadra)' : '') + (ownType ? ` · ha svolto ${TRAINING_TYPE_LABEL[ownType]}` : '')
         return {
           session: s,
           status,

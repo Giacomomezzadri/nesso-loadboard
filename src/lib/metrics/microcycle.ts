@@ -1,4 +1,4 @@
-import type { DrillSegment, Session, TrainingType } from '../../types/domain'
+import { playerTrainingType, type DrillSegment, type Session, type TrainingType } from '../../types/domain'
 
 /** The 4 training types that make up one "textbook" microcycle between matches. */
 const REQUIRED_TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico_alte_velocita', 'rifinitura']
@@ -76,11 +76,11 @@ function perTypeAverageSum(
   let sum = 0
   let typesWithData = 0
   for (const type of REQUIRED_TRAINING_TYPES) {
-    const sessionsOfType = sessions.filter((s) => s.type === 'training' && s.trainingType === type)
     const values: number[] = []
-    for (const session of sessionsOfType) {
+    for (const session of sessions) {
       const seg = fullSessionByPlayerAndSession.get(`${session.id}:${playerId}`)
-      if (seg) values.push(metric(seg))
+      // The type this player did, which may differ from the session's (see DrillSegment.trainingType).
+      if (seg && playerTrainingType(session, seg) === type) values.push(metric(seg))
     }
     if (values.length > 0) {
       sum += values.reduce((a, b) => a + b, 0) / values.length

@@ -105,6 +105,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [csvNames, setCsvNames] = useState<CsvName[]>([])
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set())
   const [markOtherTeam, setMarkOtherTeam] = useState(true)
+  /** "Add to an existing session": the training type the added players did, '' = the session's own. */
+  const [addedTrainingType, setAddedTrainingType] = useState<TrainingType | ''>('')
   const { data: sessions = [] } = useSessionsQuery()
   const sessionsOnDate = sessions.filter((s) => s.date === date)
   const target = sessionsOnDate.find((s) => s.id === targetId) ?? (sessionsOnDate.length === 1 ? sessionsOnDate[0] : undefined)
@@ -226,7 +228,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
     setSaveError(null)
     try {
       if (mode === 'existing') {
-        await commitIntoSession(staged, rpeByPlayerId, markOtherTeam)
+        const ownType = target?.type === 'training' && addedTrainingType && addedTrainingType !== target.trainingType ? addedTrainingType : undefined
+        await commitIntoSession({ ...staged, segments: staged.segments.map((s) => ({ ...s, trainingType: ownType })) }, rpeByPlayerId, markOtherTeam)
         invalidate()
         setCurrentSessionId(staged.sessionId)
         setStep('done')
@@ -511,15 +514,39 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
           )}
 
           {mode === 'existing' ? (
-            <label className="panel flex items-start gap-2 p-4 text-sm">
-              <input type="checkbox" checked={markOtherTeam} onChange={(e) => setMarkOtherTeam(e.target.checked)} className="mt-0.5 size-4 accent-primary" />
-              <span>
-                <span className="font-medium text-ink">Si sono allenati con un'altra squadra</span>
-                <span className="block text-xs text-ink-muted">
-                  Restano presenti alla sessione; nella griglia presenze il loro P viene evidenziato come "con altra squadra".
+            <div className="panel flex flex-col gap-3 p-4 text-sm">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={markOtherTeam} onChange={(e) => setMarkOtherTeam(e.target.checked)} className="mt-0.5 size-4 accent-primary" />
+                <span>
+                  <span className="font-medium text-ink">Si sono allenati con un'altra squadra</span>
+                  <span className="block text-xs text-ink-muted">
+                    Restano presenti alla sessione; nella griglia presenze il loro P viene evidenziato come "con altra squadra".
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              {target?.type === 'training' && (
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium text-ink">Tipologia svolta da questi giocatori</span>
+                  <select
+                    value={addedTrainingType}
+                    onChange={(e) => setAddedTrainingType(e.target.value as TrainingType | '')}
+                    className="max-w-sm rounded-md border border-border bg-page px-3 py-2 text-ink"
+                  >
+                    <option value="">
+                      Come la sessione ({target.trainingType ? TRAINING_TYPE_LABEL[target.trainingType] : 'non classificata'})
+                    </option>
+                    {TRAINING_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {TRAINING_TYPE_LABEL[t]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-ink-muted">
+                    Se hanno fatto un altro tipo di allenamento restano presenti, ma i loro dati contano per quella tipologia.
+                  </span>
+                </label>
+              )}
+            </div>
           ) : (
           <AttendancePanel
             sessionType={staged.metadata.type}

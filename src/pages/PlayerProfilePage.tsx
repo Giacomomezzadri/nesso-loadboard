@@ -40,7 +40,7 @@ import {
   useSettingsQuery,
   useWellnessQuery,
 } from '../state/queries'
-import { TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
+import { playerTrainingType, TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
   'per-type': 'vs somma delle medie per tipologia (Ripresa + Forza + Metabolico + Rifinitura)',
@@ -68,9 +68,10 @@ interface TrendMetricSpec {
 }
 
 /** Training rows show date + training type (the generic import label isn't useful on its own); matches keep their opponent-based label. */
-function sessionHistoryLabel(session: Session): string {
+function sessionHistoryLabel(session: Session, segment?: DrillSegment): string {
   if (session.type !== 'training') return session.label
-  const typeLabel = session.trainingType ? TRAINING_TYPE_LABEL[session.trainingType] : 'Non classificato'
+  const type = playerTrainingType(session, segment)
+  const typeLabel = type ? TRAINING_TYPE_LABEL[type] : 'Non classificato'
   return `${session.date} — ${typeLabel}`
 }
 
@@ -812,7 +813,7 @@ export function PlayerProfilePage() {
                       </td>
                       <td className={`px-4 py-2 tabular-nums ${cellText}`}>{r.session.date}</td>
                       <td className={`px-4 py-2 ${rehab ? 'text-status-critical' : 'text-ink-secondary'}`}>
-                        {sessionHistoryLabel(r.session)}
+                        {sessionHistoryLabel(r.session, r.segment)}
                         {rehab && (
                           <span className="ml-1.5 rounded-full bg-status-critical/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-status-critical">
                             Rehab

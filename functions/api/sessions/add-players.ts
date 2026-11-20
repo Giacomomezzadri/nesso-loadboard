@@ -4,7 +4,7 @@ import { type Env, rpeToRow, segmentToRow } from '../../_lib/mappers'
 import { ensurePlayerStatusTable } from '../../_lib/playerStatuses'
 import { ensureColumns } from '../../_lib/schema'
 import { RPE_UPSERT_SQL, SEGMENT_UPSERT_SQL } from '../../_lib/sessionWrites'
-import type { DrillSegment, RpeEntry } from '../../../src/types/domain'
+import { type DrillSegment, type RpeEntry, TRAINING_TYPE_LABEL } from '../../../src/types/domain'
 
 // D1 caps statements per batch; stay well under it.
 const BATCH_SIZE = 100
@@ -18,6 +18,9 @@ const BATCH_SIZE = 100
  * markOtherTeam stores the "Altra squadra" status for the added players. GPS data still
  * makes them Present everywhere (see buildStatusResolver); the status only records where
  * they trained. Without it, any stored status of theirs in this session is cleared.
+ *
+ * A segment's trainingType records that the player did a different kind of training from the
+ * session's own (e.g. Metabolico with the other squad on the team's Forza day).
  *
  * Viewers are refused non-GET calls by _middleware.ts.
  */
@@ -40,6 +43,7 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
   for (const s of segments) {
     if (s?.sessionId !== sessionId || !s.id?.startsWith(`${sessionId}:`)) return badRequest('segmento non appartenente alla sessione')
     if (!rosterIds.has(s.playerId)) return badRequest(`giocatore sconosciuto: ${s.playerId}`)
+    if (s.trainingType != null && !(s.trainingType in TRAINING_TYPE_LABEL)) return badRequest('tipo di allenamento non valido')
   }
   for (const e of rpe) {
     if (e?.sessionId !== sessionId || e.id !== `${sessionId}:${e.playerId}` || !playerIds.has(e.playerId)) return badRequest('RPE non valido')
@@ -48,6 +52,7 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
   await ensureColumns(env, 'segments', [
     { name: 'workspace_id', type: 'TEXT' },
     { name: 'is_rehab', type: 'INTEGER NOT NULL DEFAULT 0' },
+    { name: 'training_type', type: 'TEXT' },
   ])
   await ensureColumns(env, 'rpe', [{ name: 'workspace_id', type: 'TEXT' }])
   await ensurePlayerStatusTable(env)
